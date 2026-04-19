@@ -1,0 +1,48 @@
+# Secret and environment files
+.env
+.env.*
+!.env.example
+!.env.*.example
+
+# Secret snapshots and local overrides
+*.local
+*.secret
+*.secrets
+secrets.json
+secrets.yaml
+secrets.yml
+secrets.*
+
+# Certificates and key material
+*.pem
+*.key
+*.crt
+*.cer
+*.p12
+*.pfx
+*.jks
+id_rsa
+id_dsa
+id_ecdsa
+id_ed25519
+
+# Cloud credentials
+.aws/
+.azure/
+.gcp/
+*service-account*.json
+
+# Common generated artifacts
+.venv/
+venv/
+**/__pycache__/
+*.py[cod]
+**/node_modules/
+**/dist/
+*.tsbuildinfo
+
+# Pre-commit tooling artifacts
+.pre-commit-cache/
+gitleaks-report*.json
+gitleaks-report*.sarif
+gitleaks-findings*.json

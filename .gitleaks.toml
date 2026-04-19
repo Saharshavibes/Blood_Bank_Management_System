@@ -1,0 +1,12 @@
+title = "Blood Bank Management secret scanning policy"
+
+[extend]
+useDefault = true
+
+[[allowlists]]
+description = "allow tracked environment templates"
+paths = [
+  '''(^|/)\.env(\.[A-Za-z0-9._-]+)?\.example$''',
+  '''(^|/)infra/\.env\.prod\.example$''',
+  '''(^|/)infra/\.env\.example$''',
+]

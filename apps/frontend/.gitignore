@@ -1,0 +1,21 @@
+node_modules
+dist
+.env
+.env.*
+!.env.example
+.vscode
+.DS_Store
+*.log
+*.tsbuildinfo
+
+# Secret snapshots and key material
+*.local
+*.secret
+*.secrets
+secrets.*
+*.pem
+*.key
+*.crt
+*.cer
+*.p12
+*.pfx
