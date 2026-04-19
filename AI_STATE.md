@@ -198,3 +198,49 @@ Stabilize and ship the Blood Bank Management System with reliable backend and fr
 * Step 1: Trigger CI and Release Gate (staging and production) against the exact scoped commit.
 * Step 2: Maintain strict staged-slice release unless a deliberate cohort-expansion plan is approved.
 * Step 3: Capture deploy secret-readiness and rollback-target evidence for final Phase 1 GO or NO-GO.
+
+### 🧠 MEMORY UPDATE
+**Date/Time:** 2026-04-19 23:46:07 +05:30
+
+#### 1. Architecture & Context Shifts
+* Linked Vercel project for `apps/frontend` as `blood-bank-management-frontend` under `saharshavibes-projects` and established production alias routing.
+* Added Vercel project environment configuration for `VITE_API_BASE_URL` on production and development targets using expected Render service URL pattern.
+
+#### 2. What Was Accomplished
+* Completed Vercel CLI authentication and project linking from terminal-first flow.
+* Deployed frontend twice to production and confirmed active alias `https://blood-bank-management-frontend-black.vercel.app`.
+* Validated public reachability check with frontend returning HTTP 200.
+* Verified backend health endpoint candidates are not live yet, confirming backend deployment is still pending.
+
+#### 3. Known Issues & Tech Debt
+* GitHub CLI remains unauthenticated in this session, which blocks terminal-based GitHub secrets provisioning and workflow dispatch.
+* Render backend is not deployed yet and no `RENDER_API_KEY` is configured in shell, preventing API-driven provisioning from terminal.
+* Vercel preview environment variable branch binding requires connected Git integration and is currently unavailable for this project state.
+
+#### 4. Next Session Action Plan (Next Steps)
+* Step 1: Complete `gh auth login` device flow and verify with `gh auth status`.
+* Step 2: Provision or link Render backend service from `render.yaml`, set required env vars (`DATABASE_URL`, `JWT_SECRET_KEY`, `CORS_ORIGINS`), and validate `/api/v1/health`.
+* Step 3: Update Vercel `VITE_API_BASE_URL` if backend URL differs, redeploy frontend, and then execute release/deploy workflow chain.
+
+### 🧠 MEMORY UPDATE
+**Date/Time:** 2026-04-20 00:00:51 +05:30
+
+#### 1. Architecture & Context Shifts
+* Connected GitHub CLI auth for repository-level workflow and secrets automation.
+* Established partial GitHub Actions secret baseline for production URL resolution (`FRONTEND_URL*`, `BACKEND_HEALTH_URL*`, `BACKEND_AUTH_LOGIN_URL*`).
+
+#### 2. What Was Accomplished
+* Completed `gh auth login` and verified active account/token scope using `gh auth status`.
+* Triggered Release Gate run `24635968981` to validate initial secret requirements and observed expected missing-backend-url stop.
+* Added frontend and backend URL secrets, then reran Release Gate as run `24636020084`; backend/frontend quality jobs passed and smoke gate reached runtime probe stage.
+* Triggered Deploy workflow run `24636095081` and captured hard failure on missing deploy hooks (`RENDER_DEPLOY_HOOK_URL`, `VERCEL_DEPLOY_HOOK_URL`).
+
+#### 3. Known Issues & Tech Debt
+* Production deploy workflow remains blocked until both deploy hook secrets are provisioned.
+* Current backend URL assumption (`bbms-backend.onrender.com`) responds with non-FastAPI 404 payload (`Cannot GET /api/v1/health`), indicating endpoint mismatch or undeployed target.
+* Vercel project is not connected to Git integration yet, so Vercel deploy hooks and branch-scoped preview env wiring cannot be created from CLI.
+
+#### 4. Next Session Action Plan (Next Steps)
+* Step 1: Connect Vercel project to GitHub repository in Vercel settings and generate `VERCEL_DEPLOY_HOOK_URL_PRODUCTION` (or fallback key).
+* Step 2: Provision/verify Render backend service URL and create `RENDER_DEPLOY_HOOK_URL_PRODUCTION`, then correct backend URL secrets to the actual live endpoint.
+* Step 3: Re-run `release-gate.yml` and `deploy.yml` for production after hook and URL corrections, then confirm smoke-check pass.

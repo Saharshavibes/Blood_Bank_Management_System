@@ -19,3 +19,4 @@ secrets.*
 *.cer
 *.p12
 *.pfx
+.vercel

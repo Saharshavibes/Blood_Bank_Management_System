@@ -134,4 +134,6 @@ jobs:
           python scripts/deploy/smoke_check.py \
             --backend-health-url "$HEALTH_URL" \
             --frontend-url "$APP_URL" \
-            --auth-login-url "$AUTH_URL"
+            --auth-login-url "$AUTH_URL" \
+            --retries 24 \
+            --delay-seconds 10
