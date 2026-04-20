@@ -8,7 +8,7 @@ import pytest
 from fastapi.testclient import TestClient
 
 from app.api.v1 import auth as auth_api
-from app.auth.dependencies import get_current_user, get_optional_current_user
+from app.auth.dependencies import get_current_user
 from app.database.session import get_db
 from app.main import app
 from app.models.enums import DegradedState, DegradedStateSource, UserRole
@@ -300,7 +300,7 @@ def test_create_degraded_event_attaches_authenticated_user(client: TestClient) -
     app.dependency_overrides[get_db] = override_db(session)
 
     user = build_user(role=UserRole.HOSPITAL)
-    app.dependency_overrides[get_optional_current_user] = lambda: user
+    app.dependency_overrides[get_current_user] = lambda: user
 
     response = client.post(
         "/api/v1/telemetry/degraded-state",
@@ -320,6 +320,23 @@ def test_create_degraded_event_attaches_authenticated_user(client: TestClient) -
     assert len(session.added) == 1
     created_event = session.added[0]
     assert getattr(created_event, "user_id") == user.id
+
+
+def test_create_degraded_event_requires_authentication(client: TestClient) -> None:
+    session = FakeSession()
+    app.dependency_overrides[get_db] = override_db(session)
+
+    response = client.post(
+        "/api/v1/telemetry/degraded-state",
+        json={
+            "source": "inventory",
+            "state": "degraded",
+            "message": "inventory endpoint unavailable",
+        },
+    )
+
+    assert response.status_code == 401
+    assert response.json()["detail"] == "Not authenticated"
 
 
 def test_list_degraded_events_requires_authentication(client: TestClient) -> None:

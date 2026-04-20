@@ -3,7 +3,10 @@ import axios from "axios";
 import { sessionStore } from "@/lib/session";
 import type { TokenResponse } from "@/types/auth";
 
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL ?? "http://localhost:8000/api/v1";
+const configuredApiBaseUrl = typeof import.meta.env.VITE_API_BASE_URL === "string"
+  ? import.meta.env.VITE_API_BASE_URL.trim()
+  : "";
+const API_BASE_URL = configuredApiBaseUrl || (import.meta.env.DEV ? "http://localhost:8000/api/v1" : "/api/v1");
 export const AUTH_UNAUTHORIZED_EVENT = "bbms:auth-unauthorized";
 
 const AUTH_PATH_SEGMENTS = [

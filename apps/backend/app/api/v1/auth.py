@@ -1,12 +1,14 @@
+import hmac
 from datetime import UTC, datetime
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Header, status
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from app.auth.dependencies import get_current_user, get_optional_current_user
 from app.auth.security import create_access_token, get_password_hash, verify_password
+from app.config import settings
 from app.database.session import get_db
 from app.models.donor import Donor
 from app.models.enums import UserRole
@@ -127,18 +129,31 @@ def register_admin(
     payload: AdminRegisterRequest,
     db: Annotated[Session, Depends(get_db)],
     current_user: Annotated[User | None, Depends(get_optional_current_user)],
+    bootstrap_token: Annotated[str | None, Header(alias="X-Admin-Bootstrap-Token")] = None,
 ) -> AuthMessage:
     existing_user = db.scalar(select(User).where(User.email == payload.email))
     if existing_user:
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="User email already exists")
 
     admin_count = db.scalar(select(func.count()).select_from(User).where(User.role == UserRole.ADMIN)) or 0
-    if admin_count > 0:
-        if current_user is None or current_user.role != UserRole.ADMIN:
+    if admin_count == 0:
+        expected_bootstrap_token = settings.admin_bootstrap_token.strip()
+        if not expected_bootstrap_token or not bootstrap_token:
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
-                detail="Only an admin can create another admin",
+                detail="Initial admin registration requires a valid bootstrap token",
             )
+
+        if not hmac.compare_digest(bootstrap_token, expected_bootstrap_token):
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Initial admin registration requires a valid bootstrap token",
+            )
+    elif current_user is None or current_user.role != UserRole.ADMIN:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Only an admin can create another admin",
+        )
 
     user = User(
         email=payload.email,

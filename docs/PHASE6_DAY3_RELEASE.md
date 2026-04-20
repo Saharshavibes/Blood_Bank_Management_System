@@ -20,7 +20,7 @@ Create a repeatable go-live process with strict quality gates, deployment verifi
 ### Release gate
 
 - Workflow: .github/workflows/release-gate.yml
-- Runs backend and frontend quality gates before deployment smoke checks.
+- Runs backend and frontend quality gates, then verifies backend migration-state alignment before deployment smoke checks.
 - Supports `staging` and `production` targets.
 
 ## 3) Required GitHub secrets
@@ -30,7 +30,7 @@ Production:
 - RENDER_DEPLOY_HOOK_URL_PRODUCTION
 - VERCEL_DEPLOY_HOOK_URL_PRODUCTION
 - BACKEND_HEALTH_URL_PRODUCTION
-- BACKEND_AUTH_LOGIN_URL_PRODUCTION (optional; derived when omitted)
+- BACKEND_AUTH_LOGIN_URL_PRODUCTION
 - FRONTEND_URL_PRODUCTION
 
 Staging:
@@ -38,16 +38,10 @@ Staging:
 - RENDER_DEPLOY_HOOK_URL_STAGING
 - VERCEL_DEPLOY_HOOK_URL_STAGING
 - BACKEND_HEALTH_URL_STAGING
-- BACKEND_AUTH_LOGIN_URL_STAGING (optional; derived when omitted)
+- BACKEND_AUTH_LOGIN_URL_STAGING
 - FRONTEND_URL_STAGING
 
-Legacy fallback (optional for production):
-
-- RENDER_DEPLOY_HOOK_URL
-- VERCEL_DEPLOY_HOOK_URL
-- BACKEND_HEALTH_URL
-- BACKEND_AUTH_LOGIN_URL
-- FRONTEND_URL
+Legacy fallback secrets are no longer supported by the workflows.
 
 ## 4) Go-live sequence
 

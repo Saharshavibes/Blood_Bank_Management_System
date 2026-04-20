@@ -81,9 +81,6 @@ jobs:
       - frontend-quality
     env:
       TARGET_ENV: ${{ github.event.inputs.environment }}
-      BACKEND_HEALTH_URL: ${{ secrets.BACKEND_HEALTH_URL }}
-      BACKEND_AUTH_LOGIN_URL: ${{ secrets.BACKEND_AUTH_LOGIN_URL }}
-      FRONTEND_URL: ${{ secrets.FRONTEND_URL }}
       BACKEND_HEALTH_URL_STAGING: ${{ secrets.BACKEND_HEALTH_URL_STAGING }}
       BACKEND_AUTH_LOGIN_URL_STAGING: ${{ secrets.BACKEND_AUTH_LOGIN_URL_STAGING }}
       FRONTEND_URL_STAGING: ${{ secrets.FRONTEND_URL_STAGING }}
@@ -110,24 +107,23 @@ jobs:
             HEALTH_URL="$BACKEND_HEALTH_URL_PRODUCTION"
             AUTH_URL="$BACKEND_AUTH_LOGIN_URL_PRODUCTION"
             APP_URL="$FRONTEND_URL_PRODUCTION"
-
-            if [ -z "$HEALTH_URL" ]; then HEALTH_URL="$BACKEND_HEALTH_URL"; fi
-            if [ -z "$AUTH_URL" ]; then AUTH_URL="$BACKEND_AUTH_LOGIN_URL"; fi
-            if [ -z "$APP_URL" ]; then APP_URL="$FRONTEND_URL"; fi
           fi
 
-          if [ -z "$HEALTH_URL" ] || [ -z "$APP_URL" ]; then
-            echo "::error::BACKEND_HEALTH_URL and FRONTEND_URL are required for release gating"
+          if [ -z "$HEALTH_URL" ] || [ -z "$AUTH_URL" ] || [ -z "$APP_URL" ]; then
+            echo "::error::BACKEND_HEALTH_URL, BACKEND_AUTH_LOGIN_URL, and FRONTEND_URL are required for release gating"
             exit 1
-          fi
-
-          if [ -z "$AUTH_URL" ]; then
-            AUTH_URL="${HEALTH_URL%/health}/auth/login"
           fi
 
           echo "HEALTH_URL=$HEALTH_URL" >> "$GITHUB_ENV"
           echo "AUTH_URL=$AUTH_URL" >> "$GITHUB_ENV"
           echo "APP_URL=$APP_URL" >> "$GITHUB_ENV"
+
+      - name: Verify backend migration state
+        run: |
+          python scripts/deploy/verify_migration_state.py \
+            --backend-health-url "$HEALTH_URL" \
+            --retries 24 \
+            --delay-seconds 10
 
       - name: Run deployment smoke checks
         run: |

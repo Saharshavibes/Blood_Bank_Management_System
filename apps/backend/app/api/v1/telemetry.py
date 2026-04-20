@@ -4,7 +4,7 @@ from fastapi import APIRouter, Depends, Query, status
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from app.auth.dependencies import get_optional_current_user, require_roles
+from app.auth.dependencies import get_current_user, require_roles
 from app.database.session import get_db
 from app.models.degraded_state_event import DegradedStateEvent
 from app.models.enums import UserRole
@@ -19,13 +19,13 @@ router = APIRouter(prefix="/telemetry", tags=["telemetry"])
 def create_degraded_state_event(
     payload: DegradedStateEventCreate,
     db: Annotated[Session, Depends(get_db)],
-    current_user: Annotated[User | None, Depends(get_optional_current_user)],
+    current_user: Annotated[User, Depends(get_current_user)],
 ) -> DegradedStateEventRead:
     event = DegradedStateEvent(
         source=payload.source,
         state=payload.state,
         message=payload.message,
-        user_id=current_user.id if current_user else None,
+        user_id=current_user.id,
     )
     db.add(event)
     db.commit()

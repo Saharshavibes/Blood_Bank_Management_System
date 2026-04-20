@@ -2,8 +2,8 @@ name: CD Deploy Hooks
 
 on:
   push:
-    branches:
-      - main
+    tags:
+      - "v*"
   workflow_dispatch:
     inputs:
       environment:
@@ -21,11 +21,6 @@ jobs:
     runs-on: ubuntu-latest
     env:
       DEPLOY_ENV_INPUT: ${{ github.event.inputs.environment }}
-      RENDER_DEPLOY_HOOK_URL: ${{ secrets.RENDER_DEPLOY_HOOK_URL }}
-      VERCEL_DEPLOY_HOOK_URL: ${{ secrets.VERCEL_DEPLOY_HOOK_URL }}
-      BACKEND_HEALTH_URL: ${{ secrets.BACKEND_HEALTH_URL }}
-      BACKEND_AUTH_LOGIN_URL: ${{ secrets.BACKEND_AUTH_LOGIN_URL }}
-      FRONTEND_URL: ${{ secrets.FRONTEND_URL }}
       RENDER_DEPLOY_HOOK_URL_STAGING: ${{ secrets.RENDER_DEPLOY_HOOK_URL_STAGING }}
       VERCEL_DEPLOY_HOOK_URL_STAGING: ${{ secrets.VERCEL_DEPLOY_HOOK_URL_STAGING }}
       BACKEND_HEALTH_URL_STAGING: ${{ secrets.BACKEND_HEALTH_URL_STAGING }}
@@ -48,7 +43,7 @@ jobs:
       - name: Resolve target environment
         shell: bash
         run: |
-          if [ -n "$DEPLOY_ENV_INPUT" ]; then
+          if [ "${GITHUB_EVENT_NAME}" = "workflow_dispatch" ] && [ -n "$DEPLOY_ENV_INPUT" ]; then
             echo "DEPLOY_ENV=$DEPLOY_ENV_INPUT" >> "$GITHUB_ENV"
           else
             echo "DEPLOY_ENV=production" >> "$GITHUB_ENV"
@@ -64,44 +59,28 @@ jobs:
             echo "BACKEND_AUTH_LOGIN_URL=$BACKEND_AUTH_LOGIN_URL_STAGING" >> "$GITHUB_ENV"
             echo "FRONTEND_URL=$FRONTEND_URL_STAGING" >> "$GITHUB_ENV"
           else
-            RESOLVED_RENDER="$RENDER_DEPLOY_HOOK_URL_PRODUCTION"
-            RESOLVED_VERCEL="$VERCEL_DEPLOY_HOOK_URL_PRODUCTION"
-            RESOLVED_BACKEND="$BACKEND_HEALTH_URL_PRODUCTION"
-            RESOLVED_AUTH="$BACKEND_AUTH_LOGIN_URL_PRODUCTION"
-            RESOLVED_FRONTEND="$FRONTEND_URL_PRODUCTION"
-
-            if [ -z "$RESOLVED_RENDER" ]; then RESOLVED_RENDER="$RENDER_DEPLOY_HOOK_URL"; fi
-            if [ -z "$RESOLVED_VERCEL" ]; then RESOLVED_VERCEL="$VERCEL_DEPLOY_HOOK_URL"; fi
-            if [ -z "$RESOLVED_BACKEND" ]; then RESOLVED_BACKEND="$BACKEND_HEALTH_URL"; fi
-            if [ -z "$RESOLVED_AUTH" ]; then RESOLVED_AUTH="$BACKEND_AUTH_LOGIN_URL"; fi
-            if [ -z "$RESOLVED_FRONTEND" ]; then RESOLVED_FRONTEND="$FRONTEND_URL"; fi
-
-            echo "RENDER_DEPLOY_HOOK_URL=$RESOLVED_RENDER" >> "$GITHUB_ENV"
-            echo "VERCEL_DEPLOY_HOOK_URL=$RESOLVED_VERCEL" >> "$GITHUB_ENV"
-            echo "BACKEND_HEALTH_URL=$RESOLVED_BACKEND" >> "$GITHUB_ENV"
-            echo "BACKEND_AUTH_LOGIN_URL=$RESOLVED_AUTH" >> "$GITHUB_ENV"
-            echo "FRONTEND_URL=$RESOLVED_FRONTEND" >> "$GITHUB_ENV"
+            echo "RENDER_DEPLOY_HOOK_URL=$RENDER_DEPLOY_HOOK_URL_PRODUCTION" >> "$GITHUB_ENV"
+            echo "VERCEL_DEPLOY_HOOK_URL=$VERCEL_DEPLOY_HOOK_URL_PRODUCTION" >> "$GITHUB_ENV"
+            echo "BACKEND_HEALTH_URL=$BACKEND_HEALTH_URL_PRODUCTION" >> "$GITHUB_ENV"
+            echo "BACKEND_AUTH_LOGIN_URL=$BACKEND_AUTH_LOGIN_URL_PRODUCTION" >> "$GITHUB_ENV"
+            echo "FRONTEND_URL=$FRONTEND_URL_PRODUCTION" >> "$GITHUB_ENV"
           fi
 
       - name: Validate deployment configuration
         shell: bash
         run: |
-          KEYS=(RENDER_DEPLOY_HOOK_URL VERCEL_DEPLOY_HOOK_URL BACKEND_HEALTH_URL FRONTEND_URL)
+          KEYS=(RENDER_DEPLOY_HOOK_URL VERCEL_DEPLOY_HOOK_URL BACKEND_HEALTH_URL BACKEND_AUTH_LOGIN_URL FRONTEND_URL)
           MISSING=0
 
           for KEY in "${KEYS[@]}"; do
             VALUE="${!KEY}"
             if [ -z "$VALUE" ]; then
-              if [ "$DEPLOY_ENV" = "production" ]; then
-                echo "::error::$KEY is required for production deployments"
-                MISSING=1
-              else
-                echo "::warning::$KEY is not set for staging"
-              fi
+              echo "::error::$KEY is required for $DEPLOY_ENV deployments"
+              MISSING=1
             fi
           done
 
-          if [ "$DEPLOY_ENV" = "production" ] && [ "$MISSING" -ne 0 ]; then
+          if [ "$MISSING" -ne 0 ]; then
             exit 1
           fi
 
@@ -113,30 +92,22 @@ jobs:
         if: ${{ env.VERCEL_DEPLOY_HOOK_URL != '' }}
         run: curl --fail --show-error --silent -X POST "$VERCEL_DEPLOY_HOOK_URL"
 
-      - name: Run deployment smoke check script
-        if: ${{ env.BACKEND_HEALTH_URL != '' && env.FRONTEND_URL != '' }}
+      - name: Verify backend migration state
+        if: ${{ env.BACKEND_HEALTH_URL != '' }}
         shell: bash
         run: |
-          AUTH_LOGIN_URL="$BACKEND_AUTH_LOGIN_URL"
-          if [ -z "$AUTH_LOGIN_URL" ]; then
-            AUTH_LOGIN_URL="${BACKEND_HEALTH_URL%/health}/auth/login"
-          fi
-
-          python scripts/deploy/smoke_check.py \
+          python scripts/deploy/verify_migration_state.py \
             --backend-health-url "$BACKEND_HEALTH_URL" \
-            --frontend-url "$FRONTEND_URL" \
-            --auth-login-url "$AUTH_LOGIN_URL" \
             --retries 24 \
             --delay-seconds 10
 
-      - name: Verify backend health endpoint
-        if: ${{ env.BACKEND_HEALTH_URL != '' && env.FRONTEND_URL == '' }}
-        run: curl --fail --show-error --silent --retry 12 --retry-connrefused --retry-delay 5 "$BACKEND_HEALTH_URL"
-
-      - name: Verify frontend endpoint
-        if: ${{ env.FRONTEND_URL != '' && env.BACKEND_HEALTH_URL == '' }}
-        run: curl --fail --show-error --silent --retry 12 --retry-connrefused --retry-delay 5 "$FRONTEND_URL"
-
-      - name: No deploy hooks configured
-        if: ${{ env.RENDER_DEPLOY_HOOK_URL == '' && env.VERCEL_DEPLOY_HOOK_URL == '' }}
-        run: echo "Skipping CD deployment. Configure deploy hook secrets for the selected environment."
+      - name: Run deployment smoke check script
+        if: ${{ env.BACKEND_HEALTH_URL != '' && env.FRONTEND_URL != '' && env.BACKEND_AUTH_LOGIN_URL != '' }}
+        shell: bash
+        run: |
+          python scripts/deploy/smoke_check.py \
+            --backend-health-url "$BACKEND_HEALTH_URL" \
+            --frontend-url "$FRONTEND_URL" \
+            --auth-login-url "$BACKEND_AUTH_LOGIN_URL" \
+            --retries 24 \
+            --delay-seconds 10

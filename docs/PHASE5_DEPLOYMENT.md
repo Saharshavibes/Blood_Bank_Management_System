@@ -106,32 +106,31 @@ On push/PR, this workflow:
 
 Manual workflow that runs full backend/frontend quality gates and deployment smoke checks before release approval.
 Use this before running production deploy hooks.
+The gate now verifies backend migration-state alignment before smoke checks run.
 
 ### CD (.github/workflows/deploy.yml)
 
-On push to main (or manual trigger), this workflow can trigger deployment hooks.
+On version tag pushes (`v*`) or manual trigger, this workflow triggers deployment hooks.
+The deploy workflow verifies backend migration-state alignment before smoke checks run.
 
-Add these repository secrets:
-
-- RENDER_DEPLOY_HOOK_URL
-- VERCEL_DEPLOY_HOOK_URL
-
-Recommended environment-scoped secrets:
+Required environment-scoped secrets:
 
 - RENDER_DEPLOY_HOOK_URL_PRODUCTION
 - VERCEL_DEPLOY_HOOK_URL_PRODUCTION
 - BACKEND_HEALTH_URL_PRODUCTION
+- BACKEND_AUTH_LOGIN_URL_PRODUCTION
 - FRONTEND_URL_PRODUCTION
 - RENDER_DEPLOY_HOOK_URL_STAGING
 - VERCEL_DEPLOY_HOOK_URL_STAGING
 - BACKEND_HEALTH_URL_STAGING
+- BACKEND_AUTH_LOGIN_URL_STAGING
 - FRONTEND_URL_STAGING
 
 Reference template: .env.day2.example
 
 Day 3 release runbook: docs/PHASE6_DAY3_RELEASE.md
 
-If hooks are missing, CD exits gracefully without failing the pipeline.
+If required hooks or endpoint URLs are missing for the selected environment, CD fails fast.
 
 ## 7) Recommended production env values
 
@@ -165,4 +164,10 @@ Optional auth check argument:
 
 ```powershell
 python scripts\deploy\smoke_check.py --backend-health-url https://your-backend.onrender.com/api/v1/health --frontend-url https://your-frontend.vercel.app --auth-login-url https://your-backend.onrender.com/api/v1/auth/login
+```
+
+Migration-state verification command:
+
+```powershell
+python scripts\deploy\verify_migration_state.py --backend-health-url https://your-backend.onrender.com/api/v1/health
 ```

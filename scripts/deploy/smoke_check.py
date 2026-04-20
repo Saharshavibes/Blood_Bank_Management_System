@@ -17,7 +17,7 @@ def _http_request(
     request = urllib.request.Request(url, headers=headers or {}, data=body, method=method)
     with urllib.request.urlopen(request, timeout=25) as response:
         status_code = response.getcode()
-        response_headers = {k: v for k, v in response.headers.items()}
+        response_headers = {k.lower(): v for k, v in response.headers.items()}
         body = response.read(2048).decode("utf-8", errors="replace")
     return status_code, response_headers, body
 
@@ -43,7 +43,7 @@ def _request_with_retry(
             last_error = f"Unexpected status {status_code}"
         except urllib.error.HTTPError as exc:
             error_body = exc.read(2048).decode("utf-8", errors="replace")
-            response_headers = {k: v for k, v in exc.headers.items()}
+            response_headers = {k.lower(): v for k, v in exc.headers.items()}
             if exc.code in expected_statuses:
                 return exc.code, response_headers, error_body
             last_error = f"HTTP {exc.code}: {error_body}"
@@ -105,7 +105,7 @@ def main() -> int:
     summary: list[dict[str, str | int]] = []
 
     try:
-        status_code, _, body = _request_with_retry(
+        status_code, frontend_headers, body = _request_with_retry(
             "GET",
             args.frontend_url,
             accepted_statuses={200},
@@ -115,6 +115,17 @@ def main() -> int:
         if status_code >= 400:
             print(f"Frontend check failed with status {status_code}: {args.frontend_url}")
             return 1
+
+        frontend_content_type = frontend_headers.get("content-type", "").lower()
+        if "text/html" not in frontend_content_type:
+            print(f"Frontend check failed: expected text/html response, got '{frontend_content_type}'")
+            return 1
+
+        frontend_payload = body.lower()
+        if "<!doctype html" not in frontend_payload and "<html" not in frontend_payload:
+            print("Frontend check failed: response does not look like an HTML document")
+            return 1
+
         summary.append({"check": "frontend", "status": status_code, "url": args.frontend_url})
 
         origin = args.origin or _origin_from_url(args.frontend_url)
@@ -130,12 +141,17 @@ def main() -> int:
             print(f"Backend health check failed with status {backend_status}: {args.backend_health_url}")
             return 1
 
-        allow_origin = backend_headers.get("Access-Control-Allow-Origin", "")
-        if allow_origin not in {"*", origin}:
+        allow_origin = backend_headers.get("access-control-allow-origin", "")
+        if allow_origin != origin:
             print(
-                "CORS check failed: expected Access-Control-Allow-Origin to match origin or '*'. "
+                "CORS check failed: expected Access-Control-Allow-Origin to match origin. "
                 f"Got '{allow_origin}' for origin '{origin}'."
             )
+            return 1
+
+        backend_content_type = backend_headers.get("content-type", "").lower()
+        if "application/json" not in backend_content_type:
+            print(f"Backend health check failed: expected application/json response, got '{backend_content_type}'")
             return 1
 
         payload = backend_body.strip()
