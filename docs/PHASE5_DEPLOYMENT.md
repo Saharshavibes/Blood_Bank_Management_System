@@ -130,7 +130,9 @@ Reference template: .env.day2.example
 
 Day 3 release runbook: docs/PHASE6_DAY3_RELEASE.md
 
-If required hooks or endpoint URLs are missing for the selected environment, CD fails fast.
+CD enforces strict environment-matched secrets.
+If any required staging secret is missing, staging deploy fails immediately and never falls back to production hooks.
+During staging deploys, workflow isolation checks verify that resolved hooks come from staging secrets and do not resolve to production hook values.
 
 ## 7) Recommended production env values
 

@@ -56,37 +56,96 @@ jobs:
             printf '%s' "$1" | tr -d '\r\n'
           }
 
+          require_secret() {
+            local key="$1"
+            local value="$2"
+            if [ -z "$value" ]; then
+              echo "::error::$key is required for $DEPLOY_ENV deployments"
+              return 1
+            fi
+            return 0
+          }
+
+          MISSING=0
+
           if [ "$DEPLOY_ENV" = "staging" ]; then
-            RESOLVED_STAGING_RENDER="$RENDER_DEPLOY_HOOK_URL_STAGING"
-            RESOLVED_STAGING_VERCEL="$VERCEL_DEPLOY_HOOK_URL_STAGING"
+            require_secret "RENDER_DEPLOY_HOOK_URL_STAGING" "$RENDER_DEPLOY_HOOK_URL_STAGING" || MISSING=1
+            require_secret "VERCEL_DEPLOY_HOOK_URL_STAGING" "$VERCEL_DEPLOY_HOOK_URL_STAGING" || MISSING=1
+            require_secret "BACKEND_HEALTH_URL_STAGING" "$BACKEND_HEALTH_URL_STAGING" || MISSING=1
+            require_secret "BACKEND_AUTH_LOGIN_URL_STAGING" "$BACKEND_AUTH_LOGIN_URL_STAGING" || MISSING=1
+            require_secret "FRONTEND_URL_STAGING" "$FRONTEND_URL_STAGING" || MISSING=1
 
-            if [ -z "$RESOLVED_STAGING_RENDER" ]; then
-              echo "::warning::RENDER_DEPLOY_HOOK_URL_STAGING is not set; falling back to production deploy hook"
-              RESOLVED_STAGING_RENDER="$RENDER_DEPLOY_HOOK_URL_PRODUCTION"
+            if [ "$MISSING" -ne 0 ]; then
+              exit 1
             fi
 
-            if [ -z "$RESOLVED_STAGING_VERCEL" ]; then
-              echo "::warning::VERCEL_DEPLOY_HOOK_URL_STAGING is not set; falling back to production deploy hook"
-              RESOLVED_STAGING_VERCEL="$VERCEL_DEPLOY_HOOK_URL_PRODUCTION"
-            fi
-
-            echo "RENDER_DEPLOY_HOOK_URL=$(sanitize_value "$RESOLVED_STAGING_RENDER")" >> "$GITHUB_ENV"
-            echo "VERCEL_DEPLOY_HOOK_URL=$(sanitize_value "$RESOLVED_STAGING_VERCEL")" >> "$GITHUB_ENV"
+            echo "RENDER_DEPLOY_HOOK_URL=$(sanitize_value "$RENDER_DEPLOY_HOOK_URL_STAGING")" >> "$GITHUB_ENV"
+            echo "VERCEL_DEPLOY_HOOK_URL=$(sanitize_value "$VERCEL_DEPLOY_HOOK_URL_STAGING")" >> "$GITHUB_ENV"
             echo "BACKEND_HEALTH_URL=$(sanitize_value "$BACKEND_HEALTH_URL_STAGING")" >> "$GITHUB_ENV"
             echo "BACKEND_AUTH_LOGIN_URL=$(sanitize_value "$BACKEND_AUTH_LOGIN_URL_STAGING")" >> "$GITHUB_ENV"
             echo "FRONTEND_URL=$(sanitize_value "$FRONTEND_URL_STAGING")" >> "$GITHUB_ENV"
+            echo "HOOK_ENV_SOURCE=staging" >> "$GITHUB_ENV"
           else
+            require_secret "RENDER_DEPLOY_HOOK_URL_PRODUCTION" "$RENDER_DEPLOY_HOOK_URL_PRODUCTION" || MISSING=1
+            require_secret "VERCEL_DEPLOY_HOOK_URL_PRODUCTION" "$VERCEL_DEPLOY_HOOK_URL_PRODUCTION" || MISSING=1
+            require_secret "BACKEND_HEALTH_URL_PRODUCTION" "$BACKEND_HEALTH_URL_PRODUCTION" || MISSING=1
+            require_secret "BACKEND_AUTH_LOGIN_URL_PRODUCTION" "$BACKEND_AUTH_LOGIN_URL_PRODUCTION" || MISSING=1
+            require_secret "FRONTEND_URL_PRODUCTION" "$FRONTEND_URL_PRODUCTION" || MISSING=1
+
+            if [ "$MISSING" -ne 0 ]; then
+              exit 1
+            fi
+
             echo "RENDER_DEPLOY_HOOK_URL=$(sanitize_value "$RENDER_DEPLOY_HOOK_URL_PRODUCTION")" >> "$GITHUB_ENV"
             echo "VERCEL_DEPLOY_HOOK_URL=$(sanitize_value "$VERCEL_DEPLOY_HOOK_URL_PRODUCTION")" >> "$GITHUB_ENV"
             echo "BACKEND_HEALTH_URL=$(sanitize_value "$BACKEND_HEALTH_URL_PRODUCTION")" >> "$GITHUB_ENV"
             echo "BACKEND_AUTH_LOGIN_URL=$(sanitize_value "$BACKEND_AUTH_LOGIN_URL_PRODUCTION")" >> "$GITHUB_ENV"
             echo "FRONTEND_URL=$(sanitize_value "$FRONTEND_URL_PRODUCTION")" >> "$GITHUB_ENV"
+            echo "HOOK_ENV_SOURCE=production" >> "$GITHUB_ENV"
+          fi
+
+      - name: Verify staging hook isolation
+        shell: bash
+        run: |
+          if [ "$DEPLOY_ENV" != "staging" ]; then
+            exit 0
+          fi
+
+          sanitize_value() {
+            printf '%s' "$1" | tr -d '\r\n'
+          }
+
+          RESOLVED_RENDER="$(sanitize_value "$RENDER_DEPLOY_HOOK_URL")"
+          RESOLVED_VERCEL="$(sanitize_value "$VERCEL_DEPLOY_HOOK_URL")"
+          STAGING_RENDER="$(sanitize_value "$RENDER_DEPLOY_HOOK_URL_STAGING")"
+          STAGING_VERCEL="$(sanitize_value "$VERCEL_DEPLOY_HOOK_URL_STAGING")"
+          PRODUCTION_RENDER="$(sanitize_value "$RENDER_DEPLOY_HOOK_URL_PRODUCTION")"
+          PRODUCTION_VERCEL="$(sanitize_value "$VERCEL_DEPLOY_HOOK_URL_PRODUCTION")"
+
+          if [ "$HOOK_ENV_SOURCE" != "staging" ]; then
+            echo "::error::Staging deploy must resolve deployment hooks from staging secrets only"
+            exit 1
+          fi
+
+          if [ "$RESOLVED_RENDER" != "$STAGING_RENDER" ] || [ "$RESOLVED_VERCEL" != "$STAGING_VERCEL" ]; then
+            echo "::error::Staging deploy hooks were not resolved from staging secrets"
+            exit 1
+          fi
+
+          if [ -n "$PRODUCTION_RENDER" ] && [ "$RESOLVED_RENDER" = "$PRODUCTION_RENDER" ]; then
+            echo "::error::Staging Render deploy hook matches production hook; refusing deployment"
+            exit 1
+          fi
+
+          if [ -n "$PRODUCTION_VERCEL" ] && [ "$RESOLVED_VERCEL" = "$PRODUCTION_VERCEL" ]; then
+            echo "::error::Staging Vercel deploy hook matches production hook; refusing deployment"
+            exit 1
           fi
 
       - name: Validate deployment configuration
         shell: bash
         run: |
-          KEYS=(RENDER_DEPLOY_HOOK_URL VERCEL_DEPLOY_HOOK_URL BACKEND_HEALTH_URL BACKEND_AUTH_LOGIN_URL FRONTEND_URL)
+          KEYS=(RENDER_DEPLOY_HOOK_URL VERCEL_DEPLOY_HOOK_URL BACKEND_HEALTH_URL BACKEND_AUTH_LOGIN_URL FRONTEND_URL HOOK_ENV_SOURCE)
           MISSING=0
 
           for KEY in "${KEYS[@]}"; do
@@ -96,6 +155,11 @@ jobs:
               MISSING=1
             fi
           done
+
+          if [ "$HOOK_ENV_SOURCE" != "$DEPLOY_ENV" ]; then
+            echo "::error::Resolved secret source '$HOOK_ENV_SOURCE' does not match target environment '$DEPLOY_ENV'"
+            MISSING=1
+          fi
 
           if [ "$MISSING" -ne 0 ]; then
             exit 1
