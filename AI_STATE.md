@@ -244,3 +244,26 @@ Stabilize and ship the Blood Bank Management System with reliable backend and fr
 * Step 1: Connect Vercel project to GitHub repository in Vercel settings and generate `VERCEL_DEPLOY_HOOK_URL_PRODUCTION` (or fallback key).
 * Step 2: Provision/verify Render backend service URL and create `RENDER_DEPLOY_HOOK_URL_PRODUCTION`, then correct backend URL secrets to the actual live endpoint.
 * Step 3: Re-run `release-gate.yml` and `deploy.yml` for production after hook and URL corrections, then confirm smoke-check pass.
+
+### 🧠 MEMORY UPDATE
+**Date/Time:** 2026-04-20 01:09:54 +05:30
+
+#### 1. Architecture & Context Shifts
+* Increased deployment smoke-check resilience in `.github/workflows/deploy.yml` and `.github/workflows/release-gate.yml` by passing `--retries 24 --delay-seconds 10`.
+* Updated backend container runtime in `apps/backend/Dockerfile` to bind `uvicorn` to `${PORT:-8000}` for Render compatibility.
+
+#### 2. What Was Accomplished
+* Provisioned production/fallback GitHub secrets for deploy hooks and backend/frontend endpoint URLs.
+* Triggered and analyzed release/deploy workflow runs to isolate failures: `24636859428`, `24637036475`, and follow-up push-triggered runs.
+* Confirmed deploy hook steps now execute successfully in `deploy.yml` with configured secret set.
+* Committed and pushed workflow + runtime fixes in commits `aa435ec` and `4d3b4b6`.
+
+#### 3. Known Issues & Tech Debt
+* Latest push-triggered deploy run (`24637315412`) is still in progress at checkpoint time, with smoke check waiting on backend readiness.
+* Backend health URL `https://bbms-backend-ff6b.onrender.com/api/v1/health` currently returns 503 from external probing, indicating Render app availability issues remain.
+* Vercel project is still not Git-connected in Vercel dashboard, limiting branch-scoped preview variable workflows and CLI deploy-hook management semantics.
+
+#### 4. Next Session Action Plan (Next Steps)
+* Step 1: Confirm outcome/logs of run `24637315412` and validate if backend health transitions to 200 after Render redeploy completes.
+* Step 2: If backend remains unavailable, inspect Render service logs and runtime env at platform level, then correct startup/runtime faults.
+* Step 3: Re-run `release-gate.yml` production after deploy success to capture end-to-end green evidence.
