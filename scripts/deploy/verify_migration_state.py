@@ -40,7 +40,15 @@ def _http_get_with_retry(
 
 
 def _build_migration_state_url(backend_health_url: str) -> str:
-    return f"{backend_health_url.rstrip('/')}/migration-state"
+    normalized = backend_health_url.strip().rstrip("/")
+
+    if normalized.endswith("/health"):
+        return f"{normalized}/migration-state"
+
+    if normalized.endswith("/health/migration-state"):
+        return normalized
+
+    return f"{normalized}/health/migration-state"
 
 
 def main() -> int:

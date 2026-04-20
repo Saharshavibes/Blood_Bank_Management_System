@@ -52,6 +52,10 @@ jobs:
       - name: Resolve environment secrets
         shell: bash
         run: |
+          sanitize_value() {
+            printf '%s' "$1" | tr -d '\r\n'
+          }
+
           if [ "$DEPLOY_ENV" = "staging" ]; then
             RESOLVED_STAGING_RENDER="$RENDER_DEPLOY_HOOK_URL_STAGING"
             RESOLVED_STAGING_VERCEL="$VERCEL_DEPLOY_HOOK_URL_STAGING"
@@ -66,17 +70,17 @@ jobs:
               RESOLVED_STAGING_VERCEL="$VERCEL_DEPLOY_HOOK_URL_PRODUCTION"
             fi
 
-            echo "RENDER_DEPLOY_HOOK_URL=$RESOLVED_STAGING_RENDER" >> "$GITHUB_ENV"
-            echo "VERCEL_DEPLOY_HOOK_URL=$RESOLVED_STAGING_VERCEL" >> "$GITHUB_ENV"
-            echo "BACKEND_HEALTH_URL=$BACKEND_HEALTH_URL_STAGING" >> "$GITHUB_ENV"
-            echo "BACKEND_AUTH_LOGIN_URL=$BACKEND_AUTH_LOGIN_URL_STAGING" >> "$GITHUB_ENV"
-            echo "FRONTEND_URL=$FRONTEND_URL_STAGING" >> "$GITHUB_ENV"
+            echo "RENDER_DEPLOY_HOOK_URL=$(sanitize_value "$RESOLVED_STAGING_RENDER")" >> "$GITHUB_ENV"
+            echo "VERCEL_DEPLOY_HOOK_URL=$(sanitize_value "$RESOLVED_STAGING_VERCEL")" >> "$GITHUB_ENV"
+            echo "BACKEND_HEALTH_URL=$(sanitize_value "$BACKEND_HEALTH_URL_STAGING")" >> "$GITHUB_ENV"
+            echo "BACKEND_AUTH_LOGIN_URL=$(sanitize_value "$BACKEND_AUTH_LOGIN_URL_STAGING")" >> "$GITHUB_ENV"
+            echo "FRONTEND_URL=$(sanitize_value "$FRONTEND_URL_STAGING")" >> "$GITHUB_ENV"
           else
-            echo "RENDER_DEPLOY_HOOK_URL=$RENDER_DEPLOY_HOOK_URL_PRODUCTION" >> "$GITHUB_ENV"
-            echo "VERCEL_DEPLOY_HOOK_URL=$VERCEL_DEPLOY_HOOK_URL_PRODUCTION" >> "$GITHUB_ENV"
-            echo "BACKEND_HEALTH_URL=$BACKEND_HEALTH_URL_PRODUCTION" >> "$GITHUB_ENV"
-            echo "BACKEND_AUTH_LOGIN_URL=$BACKEND_AUTH_LOGIN_URL_PRODUCTION" >> "$GITHUB_ENV"
-            echo "FRONTEND_URL=$FRONTEND_URL_PRODUCTION" >> "$GITHUB_ENV"
+            echo "RENDER_DEPLOY_HOOK_URL=$(sanitize_value "$RENDER_DEPLOY_HOOK_URL_PRODUCTION")" >> "$GITHUB_ENV"
+            echo "VERCEL_DEPLOY_HOOK_URL=$(sanitize_value "$VERCEL_DEPLOY_HOOK_URL_PRODUCTION")" >> "$GITHUB_ENV"
+            echo "BACKEND_HEALTH_URL=$(sanitize_value "$BACKEND_HEALTH_URL_PRODUCTION")" >> "$GITHUB_ENV"
+            echo "BACKEND_AUTH_LOGIN_URL=$(sanitize_value "$BACKEND_AUTH_LOGIN_URL_PRODUCTION")" >> "$GITHUB_ENV"
+            echo "FRONTEND_URL=$(sanitize_value "$FRONTEND_URL_PRODUCTION")" >> "$GITHUB_ENV"
           fi
 
       - name: Validate deployment configuration

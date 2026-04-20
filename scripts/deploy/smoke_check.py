@@ -102,6 +102,11 @@ def main() -> int:
     )
     args = parser.parse_args()
 
+    args.backend_health_url = args.backend_health_url.strip()
+    args.frontend_url = args.frontend_url.strip()
+    args.auth_login_url = args.auth_login_url.strip()
+    args.origin = args.origin.strip()
+
     summary: list[dict[str, str | int]] = []
 
     try:

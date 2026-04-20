@@ -99,6 +99,10 @@ jobs:
       - name: Resolve smoke target URLs
         shell: bash
         run: |
+          sanitize_url() {
+            printf '%s' "$1" | tr -d '\r\n'
+          }
+
           if [ "$TARGET_ENV" = "staging" ]; then
             HEALTH_URL="$BACKEND_HEALTH_URL_STAGING"
             AUTH_URL="$BACKEND_AUTH_LOGIN_URL_STAGING"
@@ -108,6 +112,10 @@ jobs:
             AUTH_URL="$BACKEND_AUTH_LOGIN_URL_PRODUCTION"
             APP_URL="$FRONTEND_URL_PRODUCTION"
           fi
+
+          HEALTH_URL="$(sanitize_url "$HEALTH_URL")"
+          AUTH_URL="$(sanitize_url "$AUTH_URL")"
+          APP_URL="$(sanitize_url "$APP_URL")"
 
           if [ -z "$HEALTH_URL" ] || [ -z "$AUTH_URL" ] || [ -z "$APP_URL" ]; then
             echo "::error::BACKEND_HEALTH_URL, BACKEND_AUTH_LOGIN_URL, and FRONTEND_URL are required for release gating"
