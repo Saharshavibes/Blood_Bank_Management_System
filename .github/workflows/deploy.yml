@@ -53,8 +53,21 @@ jobs:
         shell: bash
         run: |
           if [ "$DEPLOY_ENV" = "staging" ]; then
-            echo "RENDER_DEPLOY_HOOK_URL=$RENDER_DEPLOY_HOOK_URL_STAGING" >> "$GITHUB_ENV"
-            echo "VERCEL_DEPLOY_HOOK_URL=$VERCEL_DEPLOY_HOOK_URL_STAGING" >> "$GITHUB_ENV"
+            RESOLVED_STAGING_RENDER="$RENDER_DEPLOY_HOOK_URL_STAGING"
+            RESOLVED_STAGING_VERCEL="$VERCEL_DEPLOY_HOOK_URL_STAGING"
+
+            if [ -z "$RESOLVED_STAGING_RENDER" ]; then
+              echo "::warning::RENDER_DEPLOY_HOOK_URL_STAGING is not set; falling back to production deploy hook"
+              RESOLVED_STAGING_RENDER="$RENDER_DEPLOY_HOOK_URL_PRODUCTION"
+            fi
+
+            if [ -z "$RESOLVED_STAGING_VERCEL" ]; then
+              echo "::warning::VERCEL_DEPLOY_HOOK_URL_STAGING is not set; falling back to production deploy hook"
+              RESOLVED_STAGING_VERCEL="$VERCEL_DEPLOY_HOOK_URL_PRODUCTION"
+            fi
+
+            echo "RENDER_DEPLOY_HOOK_URL=$RESOLVED_STAGING_RENDER" >> "$GITHUB_ENV"
+            echo "VERCEL_DEPLOY_HOOK_URL=$RESOLVED_STAGING_VERCEL" >> "$GITHUB_ENV"
             echo "BACKEND_HEALTH_URL=$BACKEND_HEALTH_URL_STAGING" >> "$GITHUB_ENV"
             echo "BACKEND_AUTH_LOGIN_URL=$BACKEND_AUTH_LOGIN_URL_STAGING" >> "$GITHUB_ENV"
             echo "FRONTEND_URL=$FRONTEND_URL_STAGING" >> "$GITHUB_ENV"
