@@ -119,11 +119,13 @@ jobs:
           echo "APP_URL=$APP_URL" >> "$GITHUB_ENV"
 
       - name: Verify backend migration state
+        timeout-minutes: 6
         run: |
           python scripts/deploy/verify_migration_state.py \
             --backend-health-url "$HEALTH_URL" \
-            --retries 24 \
-            --delay-seconds 10
+            --retries 12 \
+            --delay-seconds 5 \
+            --request-timeout 8
 
       - name: Run deployment smoke checks
         run: |

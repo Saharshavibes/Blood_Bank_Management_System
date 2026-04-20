@@ -107,12 +107,14 @@ jobs:
 
       - name: Verify backend migration state
         if: ${{ env.BACKEND_HEALTH_URL != '' }}
+        timeout-minutes: 6
         shell: bash
         run: |
           python scripts/deploy/verify_migration_state.py \
             --backend-health-url "$BACKEND_HEALTH_URL" \
-            --retries 24 \
-            --delay-seconds 10
+            --retries 12 \
+            --delay-seconds 5 \
+            --request-timeout 8
 
       - name: Run deployment smoke check script
         if: ${{ env.BACKEND_HEALTH_URL != '' && env.FRONTEND_URL != '' && env.BACKEND_AUTH_LOGIN_URL != '' }}
