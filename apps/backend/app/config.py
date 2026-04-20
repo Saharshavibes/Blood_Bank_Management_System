@@ -21,6 +21,24 @@ class Settings(BaseSettings):
     refresh_token_entropy_bytes: int = 48
     cors_origins: Annotated[list[str], NoDecode] = ["http://localhost:5173"]
 
+    @field_validator("database_url", mode="before")
+    @classmethod
+    def normalize_database_url(cls, value: Any) -> str:
+        if not isinstance(value, str):
+            raise ValueError("DATABASE_URL must be a string")
+
+        normalized = value.strip()
+        if not normalized:
+            raise ValueError("DATABASE_URL must not be empty")
+
+        if normalized.startswith("postgres://"):
+            return f"postgresql+psycopg2://{normalized[len('postgres://') :]}"
+
+        if normalized.startswith("postgresql://"):
+            return f"postgresql+psycopg2://{normalized[len('postgresql://') :]}"
+
+        return normalized
+
     @field_validator("cors_origins", mode="before")
     @classmethod
     def parse_cors_origins(cls, value: Any) -> list[str]:
