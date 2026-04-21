@@ -267,3 +267,242 @@ Stabilize and ship the Blood Bank Management System with reliable backend and fr
 * Step 1: Confirm outcome/logs of run `24637315412` and validate if backend health transitions to 200 after Render redeploy completes.
 * Step 2: If backend remains unavailable, inspect Render service logs and runtime env at platform level, then correct startup/runtime faults.
 * Step 3: Re-run `release-gate.yml` production after deploy success to capture end-to-end green evidence.
+
+### 🧠 MEMORY UPDATE
+**Date/Time:** 2026-04-21 — Comprehensive Audit & Deployment Roadmap
+
+#### 1. Architecture & Context Shifts
+* Conducted full deployment audit targeting a 16 GB CPU-only host. Roadmap persisted at `C:\Users\Muzaffar\.claude\plans\mission-execute-an-merry-walrus.md`.
+* Confirmed stack is CPU-pure: zero GPU/ML dependencies in `apps/backend/requirements.txt`; no torch/transformers/faiss/vllm anywhere in tree.
+* Verified Alembic env.py metadata is complete — `app/models/__init__.py` re-exports all seven models, so `Base.metadata` registers `RefreshToken` and `DegradedStateEvent` despite env.py only naming five symbols. An earlier "missing import" reading was a false positive.
+
+#### 2. What Was Accomplished
+* Mapped 25 backend endpoints; confirmed 18 have no frontend caller (full CRUD on donors/inventory/requests, plus admin registration and logout-all). Logged as RBAC-coverage risk, not a deploy blocker.
+* Produced gap matrix grading every deployment-relevant feature P0–P3 across migrations, resource limits, worker concurrency, secret hygiene, network exposure, log rotation, and schema completeness.
+* Validated FK constraints, Enum values, and Pydantic IO contracts align with Alembic schema for every wired endpoint.
+
+#### 3. Known Issues & Tech Debt
+* **P0 — Container does not self-bootstrap DB.** `apps/backend/Dockerfile:22` runs uvicorn directly; fresh `docker compose -f infra/docker-compose.prod.yml up` leaves an empty schema. Fix: add `apps/backend/scripts/entrypoint.sh` that runs `alembic upgrade head` before exec'ing uvicorn.
+* **P0 — No `deploy.resources.limits` in `infra/docker-compose.prod.yml`.** A single OOM event on a 16 GB host can take down Postgres. Proposed caps: postgres 4 GB / 2 cpu, backend 2 GB / 1.5 cpu, frontend 256 MB / 0.5 cpu.
+* **P1 — Working defaults templated for `JWT_SECRET_KEY` and `POSTGRES_PASSWORD`** in `infra/docker-compose.prod.yml`. Replace with `${VAR:?...required}` to fail before image build instead of after.
+* **P1 — Single uvicorn worker + sync psycopg2** blocks all requests on long queries. Set `WEB_CONCURRENCY=2` via the entrypoint script.
+* **P1 — Postgres published on 0.0.0.0** with default creds. Bind to `127.0.0.1` in self-host compose.
+* **P2 — Hospital lacks Pydantic IO schemas** under `app/schemas/`. Future endpoints returning Hospital rows could leak the ORM model.
+* **P2 — Frontend nginx logs unbounded** (default json-file driver, no max-size). Disk-fill scenario.
+* **P2 — No `infra/HOST_PREFLIGHT.md`** capturing swap setup and the single "go" command for self-host.
+* **P3 — `Numeric(9,6)` lat/long mapped to Python `float`** in `app/models/hospital.py:30-31`. Sub-meter routing drift.
+
+#### 4. Next Session Action Plan (Next Steps)
+* Step 1: Implement Step A1 of the audit roadmap — entrypoint script + Dockerfile change so `docker compose up` self-bootstraps the database. Recursive prompt is captured in the plan file.
+* Step 2: Apply Step B1–B3 — resource limits, json-file log rotation (10m × 5), localhost-bind Postgres in `infra/docker-compose.prod.yml`.
+* Step 3: Add `infra/HOST_PREFLIGHT.md` and `apps/backend/app/schemas/hospital.py`; verify end-to-end with `scripts/deploy/smoke_check.py` against the local prod stack.
+
+### 🧠 MEMORY UPDATE
+**Date/Time:** 2026-04-21 — Step A1 Implementation: Self-Bootstrapping Backend Container
+
+#### 1. Architecture & Context Shifts
+* Backend image now self-bootstraps the schema. New `apps/backend/scripts/entrypoint.sh` runs `alembic upgrade head` then exec's uvicorn. `apps/backend/Dockerfile` switched its `CMD` to `["/entrypoint.sh"]` and now also `COPY`s `alembic.ini` (previously missing — would have made `alembic upgrade head` inside the image impossible).
+* `WEB_CONCURRENCY` env var now drives uvicorn `--workers` (default 2). `PORT` env var fallback (`${PORT:-8000}`) preserved.
+
+#### 2. What Was Accomplished
+* Created `apps/backend/scripts/entrypoint.sh` (POSIX sh, `set -e`, LF line endings verified via `od -c`).
+* Patched `apps/backend/Dockerfile`: added `COPY alembic.ini ./alembic.ini`, `COPY scripts/entrypoint.sh /entrypoint.sh`, `RUN chmod +x /entrypoint.sh`, replaced `CMD` with `["/entrypoint.sh"]`.
+* Confirmed `apps/backend/.dockerignore` does not exclude `scripts/` or `alembic.ini` (it only filters venv/cache/git artifacts).
+* Resolved the Step A1 P0 finding: a fresh `docker compose -f infra/docker-compose.prod.yml up` will now apply migrations before serving traffic.
+
+#### 3. Known Issues & Tech Debt
+* **Verification deferred to operator.** Local Docker daemon was not running during this session, so the build/run smoke could not be executed in-loop. The intended verification: `cd apps/backend && docker build -t bbms-backend:a1 . && docker run --rm -e DATABASE_URL=postgresql+psycopg2://bbms_user:bbms_password@host.docker.internal:5432/blood_bank -e JWT_SECRET_KEY=$(python -c "import secrets;print(secrets.token_urlsafe(48))") -p 8000:8000 bbms-backend:a1` then `curl http://localhost:8000/api/v1/health` (expect `{"status":"ok"}`) and `psql … -c "select * from alembic_version;"` (expect head revision row).
+* Step B1–B3 (resource limits, log rotation, localhost-bind Postgres) and Step A2 (`${VAR:?required}` for JWT/POSTGRES secrets) remain outstanding from the audit roadmap.
+
+#### 4. Next Session Action Plan (Next Steps)
+* Step 1: Run the deferred Docker build/run verification on a host with Docker Desktop running and confirm `alembic_version` populates and `/api/v1/health` returns ok.
+* Step 2: Implement Step A2 — drop the `JWT_SECRET_KEY` and `POSTGRES_PASSWORD` defaults in `infra/docker-compose.prod.yml` to `${VAR:?...required}` form.
+* Step 3: Implement Steps B1–B3 — `deploy.resources.limits` per service, `logging.driver=json-file` with `max-size=10m, max-file=5`, and bind Postgres to `127.0.0.1` in self-host compose.
+
+### 🧠 MEMORY UPDATE
+**Date/Time:** 2026-04-21 — Step A2 Implementation: Fail-Fast Secret Templating
+
+#### 1. Architecture & Context Shifts
+* `infra/docker-compose.prod.yml` no longer templates working defaults for the two true secrets. `${POSTGRES_PASSWORD:-bbms_password}` → `${POSTGRES_PASSWORD:?POSTGRES_PASSWORD required}` (in both the `postgres.environment` block and the backend `DATABASE_URL` interpolation). `${JWT_SECRET_KEY:-change-this-secret-key}` → `${JWT_SECRET_KEY:?JWT_SECRET_KEY required}`.
+* Non-secret defaults (`POSTGRES_DB`, `POSTGRES_USER`, `APP_NAME`, ports, etc.) intentionally kept — only credential material was promoted to required.
+
+#### 2. What Was Accomplished
+* Patched three lines in `infra/docker-compose.prod.yml` (lines 9, 32, 33).
+* Verified fail-fast: `docker compose -f docker-compose.prod.yml config` (with no `.env.prod` loaded) now exits non-zero with `required variable POSTGRES_PASSWORD is missing a value: POSTGRES_PASSWORD required` — interpolation fails before any image is built or pulled.
+
+#### 3. Known Issues & Tech Debt
+* `infra/.env.prod.example` should still be reviewed under Step B5 to ensure the example file documents `POSTGRES_PASSWORD` and `JWT_SECRET_KEY` clearly (and to add `WEB_CONCURRENCY=2` while there).
+* Steps B1–B3 (resource limits, log rotation, localhost-bind Postgres) and Step A3 (`HospitalRead`/`HospitalUpdate` schemas) remain outstanding from the audit roadmap.
+
+#### 4. Next Session Action Plan (Next Steps)
+* Step 1: Implement Step A3 — add `apps/backend/app/schemas/hospital.py` with `HospitalRead`/`HospitalUpdate` mirroring the donor schema style.
+* Step 2: Implement Steps B1–B3 — `deploy.resources.limits` per service, `logging.driver=json-file` with `max-size=10m, max-file=5`, and bind Postgres to `127.0.0.1` in self-host compose.
+* Step 3: Implement Step B5 — refresh `infra/.env.prod.example` to include `POSTGRES_PASSWORD`, `JWT_SECRET_KEY`, and `WEB_CONCURRENCY` with documenting comments (example file only).
+
+### 🧠 MEMORY UPDATE
+**Date/Time:** 2026-04-21 — Step A3 Implementation: Hospital Pydantic IO Schemas
+
+#### 1. Architecture & Context Shifts
+* New file `apps/backend/app/schemas/hospital.py` defines `HospitalRead` (full ORM-compatible read model with `model_config = ConfigDict(from_attributes=True)`) and `HospitalUpdate` (all fields optional, `latitude`/`longitude` bounded with `ge`/`le` to mirror the DB CheckConstraints `hospitals_lat_range` and `hospitals_lng_range`).
+* Schema mirrors the donor schema style — same import set, same field-style, same ConfigDict pattern. Field max-lengths (`name=200`, `city=100`, `contact_phone=30`) match the SQLAlchemy `String(N)` widths in `app/models/hospital.py`.
+* `HospitalRegisterRequest` in `app/schemas/auth.py` is unchanged — registration is auth-bound and stays there; the new schemas cover the read/update half that was previously missing.
+
+#### 2. What Was Accomplished
+* Created `apps/backend/app/schemas/hospital.py` (31 lines, zero comments).
+* Verified AST parse and `py_compile` clean. Pydantic runtime import was not exercised because the system Python does not have project deps; full runtime validation will happen on the next CI run / `pytest -q`.
+* Closed the P2 latent leak risk: any future endpoint that returns a Hospital row can now serialize through `HospitalRead` instead of leaking the ORM object.
+
+#### 3. Known Issues & Tech Debt
+* No backend route currently consumes `HospitalRead`/`HospitalUpdate`. Wiring will land naturally with the next Hospital-facing endpoint (admin update flow, hospital profile read, etc.).
+* `latitude`/`longitude` typed as `float` in both ORM and schema preserves the `Numeric(9,6) → float` round-trip noted as P3 in the audit; out of scope for this step.
+* Steps B1–B3 (resource limits, log rotation, localhost-bind Postgres) and Step B5 (`.env.prod.example` refresh) remain outstanding from the audit roadmap.
+
+#### 4. Next Session Action Plan (Next Steps)
+* Step 1: Implement Steps B1–B3 — `deploy.resources.limits` per service, `logging.driver=json-file` with `max-size=10m, max-file=5`, and bind Postgres to `127.0.0.1` in self-host compose.
+* Step 2: Implement Step B5 — refresh `infra/.env.prod.example` to include `POSTGRES_PASSWORD`, `JWT_SECRET_KEY`, and `WEB_CONCURRENCY` with documenting comments (example file only).
+* Step 3: Run the deferred Docker build/run verification on a host with Docker Desktop running and confirm `alembic_version` populates and `/api/v1/health` returns ok.
+
+### 🧠 MEMORY UPDATE
+**Date/Time:** 2026-04-21 — Steps B1–B3 Implementation: Deployment Shield
+
+#### 1. Architecture & Context Shifts
+* `infra/docker-compose.prod.yml` is now hardened for a 16 GB CPU-only host:
+  * **Resource limits (B1)** — `postgres: 4G/2.0 cpu`, `backend: 2G/1.5 cpu`, `frontend: 256M/0.5 cpu` via `deploy.resources.limits` (compose v2 honors this in non-swarm mode). Total ceiling ~6.25 GB, leaving ~9 GB for OS + swap headroom.
+  * **Postgres tuning (B1)** — `command:` override sets `shared_buffers=1GB`, `effective_cache_size=2GB`, `work_mem=16MB`, `max_connections=50`. The 50-conn cap is intentional: `WEB_CONCURRENCY=2 × pool_size~5 × 2 services = ~20 sessions`, with headroom for migrations and maintenance.
+  * **Worker concurrency (B1)** — backend env now exports `WEB_CONCURRENCY: ${WEB_CONCURRENCY:-2}`. The Step A1 entrypoint script consumes this for `uvicorn --workers`.
+  * **Log rotation (B2)** — all three services pinned to `json-file` driver with `max-size=10m, max-file=5` (50 MB ceiling per service).
+  * **Network isolation (B3)** — Postgres port binding now reads `${POSTGRES_BIND_HOST:-127.0.0.1}:${POSTGRES_PORT:-5432}:5432`. Default loopback-only; operator opts into LAN exposure by setting `POSTGRES_BIND_HOST=0.0.0.0` in `.env.prod`. Backend reaches Postgres via the docker network as `postgres:5432` regardless — host bind is unrelated to inter-container traffic.
+* `infra/.env.prod.example` documents both `POSTGRES_BIND_HOST` (with the loopback rationale) and `WEB_CONCURRENCY` (2-worker baseline for 16 GB host).
+
+#### 2. What Was Accomplished
+* Rewrote `infra/docker-compose.prod.yml` to add `command`, `deploy.resources.limits`, `logging`, and `WEB_CONCURRENCY` blocks; switched Postgres port binding to host-ip parameterized with a 127.0.0.1 default.
+* Patched `infra/.env.prod.example` with `POSTGRES_BIND_HOST` and `WEB_CONCURRENCY` lines plus documenting comments (example file only — no comments leaked into compose or app code).
+* Verified via `docker compose -f docker-compose.prod.yml config`: rendered output shows `host_ip: 127.0.0.1` on Postgres, `cpus: 1.5 / memory: 2147483648` on backend, `cpus: 0.5 / memory: 268435456` on frontend, `cpus: 2.0 / memory: 4294967296` on Postgres, and the json-file logging block on all three.
+* Closed P0 (no resource limits) and P1 (Postgres exposed on 0.0.0.0) findings from the gap matrix in a single compose pass.
+
+#### 3. Known Issues & Tech Debt
+* `deploy.resources.limits` is honored by `docker compose up` (v2.x) on non-swarm runtimes but is silently ignored by older `docker-compose v1`. Operators on legacy CLI must upgrade to `docker compose` (the v2 plugin) — document in `HOST_PREFLIGHT.md` (Step B4, still outstanding).
+* `pool_size` in `app/database/session.py` should be sanity-checked against the new `max_connections=50` ceiling on next backend touch.
+* Steps B4 (HOST_PREFLIGHT.md) and B5 (full `.env.prod.example` refresh — strip working defaults from secrets) remain outstanding.
+
+#### 4. Next Session Action Plan (Next Steps)
+* Step 1: Implement Step B4 — write `infra/HOST_PREFLIGHT.md` with swap setup (`fallocate -l 4G /swapfile` …), Docker daemon notes, expected free RAM/disk, and the single "go" command.
+* Step 2: Implement Step B5 — strip the `bbms_password` and `replace-with-a-strong-secret` placeholders from `infra/.env.prod.example` so the file communicates intent without templating fake values.
+* Step 3: Run the deferred Docker build/run verification on a host with Docker Desktop running and confirm `alembic_version` populates and `/api/v1/health` returns ok.
+
+### 🧠 MEMORY UPDATE
+**Date/Time:** 2026-04-21 — Step B4 Implementation: Host Pre-Flight Runbook
+
+#### 1. Architecture & Context Shifts
+* New doc `infra/HOST_PREFLIGHT.md` captures every operator pre-condition for a single-tenant 16 GB self-host: Docker Engine ≥ 24 with Compose v2 plugin (calls out the v1 silently-ignores-limits trap from the B1–B3 caveat), 16 GB RAM / 30 GB disk, outbound HTTPS to Docker Hub.
+* Documents 4 GB swap setup (`fallocate` + `swapon` + `/etc/fstab` + `vm.swappiness=10`) sized for migration and Vite-build spikes.
+* Documents `/etc/docker/daemon.json` ulimit and host-level log-driver defaults so unmanaged sidecar containers also stay bounded.
+* Single-line "go" command: `cd infra && cp .env.prod.example .env.prod && $EDITOR .env.prod && docker compose --env-file .env.prod -f docker-compose.prod.yml up -d --build`.
+* Smoke commands explicitly call out the three things to verify: `/api/v1/health`, `docker stats --no-stream`, and an `alembic_version` row at head.
+
+#### 2. What Was Accomplished
+* Created `infra/HOST_PREFLIGHT.md` (≈55 lines, terse). Codifies the Step A1 self-bootstrap, A2 fail-fast secrets, B1 resource limits, B2 log rotation, and B3 loopback Postgres into a single operator-facing runbook.
+* Reinforced the B3 LAN-exposure warning (rotate `POSTGRES_PASSWORD` before flipping `POSTGRES_BIND_HOST` to `0.0.0.0`).
+
+#### 3. Known Issues & Tech Debt
+* `HOST_PREFLIGHT.md` assumes a Linux host. Windows/macOS Docker Desktop operators get the swap section as inert reading material; a dedicated section for Docker Desktop tuning (memory slider in Settings → Resources) is a nice-to-have but not a deploy blocker.
+* Step B5 (`.env.prod.example` placeholder cleanup) and the deferred Docker build/run smoke remain outstanding.
+
+#### 4. Next Session Action Plan (Next Steps)
+* Step 1: Implement Step B5 — strip the `bbms_password` and `replace-with-a-strong-secret` placeholders from `infra/.env.prod.example` so the example file communicates required-secret intent without templating fake values.
+* Step 2: Run the deferred Docker build/run verification on a host with Docker Desktop running and confirm `alembic_version` populates and `/api/v1/health` returns ok per the new `HOST_PREFLIGHT.md` smoke block.
+* Step 3: Optional — sanity-check `pool_size` in `app/database/session.py` against the new Postgres `max_connections=50` ceiling.
+
+### 🧠 MEMORY UPDATE
+**Date/Time:** 2026-04-21 — Step B5 Implementation: Example File Hardening + Audit Steps A1–B5 Complete
+
+#### 1. Architecture & Context Shifts
+* `infra/.env.prod.example` rewritten: `POSTGRES_PASSWORD` and `JWT_SECRET_KEY` are now empty by design with a leading "Required secrets" comment block explaining why and pointing to `python -c "import secrets;print(secrets.token_urlsafe(48))"` for the JWT secret. The file no longer templates a working fallback that an operator might ship to prod.
+* Reorganized into four titled sections (Required secrets / Postgres / Backend / Frontend) for scan-ability.
+* End-to-end fail-fast contract verified: `docker compose --env-file .env.prod.example -f docker-compose.prod.yml config` exits non-zero with `required variable POSTGRES_PASSWORD is missing a value: POSTGRES_PASSWORD required`. The example file proves the safety mechanism rather than working around it.
+
+#### 2. What Was Accomplished
+* Rewrote `infra/.env.prod.example` (28 lines) — empty required secrets, organized sections, terse documenting comments (example file only — no comments leaked into compose, app, or scripts).
+* Closed the entire **Step A (STRICT REFACTOR)** and **Step B (DEPLOYMENT SHIELD)** blocks of the audit roadmap at `C:\Users\Muzaffar\.claude\plans\mission-execute-an-merry-walrus.md`. All compose-layer and Dockerfile-layer P0/P1/P2 findings from the gap matrix are addressed.
+
+#### 3. Known Issues & Tech Debt
+* Only the **Step C (VERIFICATION)** Docker build/run smoke remains deferred — needs a live Docker daemon. Operator can run it directly using `infra/HOST_PREFLIGHT.md` as the script.
+* Optional follow-up: sanity-check `pool_size` in `app/database/session.py` against the new Postgres `max_connections=50` ceiling on the next backend touch.
+
+#### 4. Next Session Action Plan (Next Steps)
+* Step 1: Operator runs the deferred Docker build/run smoke from `infra/HOST_PREFLIGHT.md` and confirms `alembic_version` populates and `/api/v1/health` returns ok.
+* Step 2: Re-trigger `release-gate.yml` and `deploy.yml` against staging/production with the hardened compose to make sure CI didn't depend on any of the templated defaults.
+* Step 3: Optional — `pool_size` sanity check against `max_connections=50`; revisit P3 items from the gap matrix (frontend caller coverage for the 18 unwired endpoints, `Numeric(9,6) → float` routing precision).
+
+### 🧠 MEMORY UPDATE
+**Date/Time:** 2026-04-21 — B9 Type-Honesty Fix + Phase 1/2 Closure
+
+#### 1. Architecture & Context Shifts
+* `app/models/hospital.py` now types the lat/long ORM attributes as `Decimal | None` (matching what psycopg2 actually returns for `Numeric(9, 6)`). Added `from decimal import Decimal`. The ORM now tells the truth.
+* `app/api/v1/auth.py` converts incoming `payload.latitude`/`payload.longitude` (Pydantic `float | None` at the API boundary) to `Decimal(str(...))` before passing to the `Hospital` constructor. Using `Decimal(str(x))` avoids the `Decimal(float) → long-tail-binary-artefact` trap.
+* `app/services/routing.py` was already correct — it explicitly `float(...)`-casts the Decimal attributes before passing them to haversine math. No change needed there.
+* API contracts (`HospitalRead`, `HospitalRegisterRequest`, `RoutingCandidate`, `RoutingHospitalPoint`) remain `float` — the boundary layer where float is the right primitive for JSON.
+
+#### 2. What Was Accomplished
+* B9 closed: ORM type annotation no longer lies about the runtime type of lat/long. Full storage-layer precision (`Numeric(9, 6)` = 6 decimal places ≈ 11 cm lat resolution) is preserved end-to-end; only the haversine computation step lossily casts to `float`, which is appropriate (haversine itself has spherical-earth noise well above the Decimal → float gap).
+* Verified: `py_compile` clean on both `app/models/hospital.py` and `app/api/v1/auth.py`. No tests exercise lat/long so no regression surface in the test suite.
+
+**Phase 2 findings final mapping — all 9 closed:**
+* B1 (migrations not bootstrapped in container) → closed by Phase 4 Step A1 (entrypoint script).
+* B2 (no memory/CPU caps) → closed by Phase 4 Step B1 (`deploy.resources.limits`).
+* B3 (worker count unmanaged) → closed by Phase 4 Step A1 + B1 (`WEB_CONCURRENCY=2`).
+* B4 (JWT/Postgres secret defaults) → closed by Phase 4 Step A2 (`${VAR:?required}`).
+* B5 (Postgres exposed on 0.0.0.0) → closed by Phase 4 Step B3 (`POSTGRES_BIND_HOST=127.0.0.1`).
+* B6 (no swap/pre-flight) → closed by Phase 4 Step B4 (`infra/HOST_PREFLIGHT.md`).
+* B7 (frontend nginx logs unbounded) → closed by Phase 4 Step B2 (json-file `max-size=10m, max-file=5`).
+* B8 (Hospital lacks Pydantic schemas) → closed by Phase 4 Step A3 (`HospitalRead`/`HospitalUpdate`).
+* B9 (Numeric(9,6) ↔ float roundtrip) → closed in this update.
+
+**Phase 1 findings final mapping:**
+* Stack reality (CPU-pure, pinned deps) — unchanged, still true.
+* Dead logic surface (18 of 25 endpoints have no frontend caller) — logged as RBAC-coverage risk in the memory from 2026-04-21 audit entry; not a deploy blocker, intentionally left for separate follow-up.
+* Schema integrity (Alembic env.py metadata complete) — confirmed, no change.
+
+#### 3. Known Issues & Tech Debt
+* Only **Phase 4 Step C (Docker build/run smoke)** remains deferred — requires a live Docker daemon. Operator can execute directly from `infra/HOST_PREFLIGHT.md`.
+* Dead-endpoint surface (18 unwired backend endpoints) remains open as a future RBAC/test-coverage initiative; not a deployment blocker.
+
+#### 4. Next Session Action Plan (Next Steps)
+* Step 1: Operator runs the deferred Docker build/run smoke from `infra/HOST_PREFLIGHT.md` on a host with Docker Desktop running.
+* Step 2: Re-trigger `release-gate.yml` and `deploy.yml` against staging with the hardened compose to confirm no CI step depended on the templated defaults that were removed in Step A2/B5.
+
+---
+
+### 🧠 MEMORY UPDATE
+**Date/Time:** 2026-04-21
+
+#### 1. Architecture & Context Shifts
+* **Phase 4 Step C executed end-to-end on a live Docker daemon (29.3.1, Compose v2 plugin).** Audit plan at `C:\Users\Muzaffar\.claude\plans\mission-execute-an-merry-walrus.md` is now 100% executed; nothing deferred.
+* `infra/.env.prod` now exists on this machine with generated secrets (`secrets.token_urlsafe(48)` for JWT, `secrets.token_urlsafe(32)` for Postgres). File is gitignored; do not commit. Rotate before any LAN exposure.
+* `infra_postgres_prod_data` volume was preserved through teardown — next `up` will skip migrations replay (entrypoint `alembic upgrade head` is idempotent).
+
+#### 2. What Was Accomplished
+* **Build:** `docker compose --env-file .env.prod -f docker-compose.prod.yml up -d --build` succeeded on first try. Backend image built with A1 layers (alembic.ini + entrypoint.sh) present.
+* **Bootstrap (A1 live proof):** Backend entrypoint logs show `alembic.runtime.migration` applied both revisions (`20260413_000001` initial schema → `20260418_000002` auth sessions + telemetry) before uvicorn started. Parent process + 2 workers spawned (matching `WEB_CONCURRENCY=2`).
+* **Smoke — all green with evidence:**
+  * `GET /api/v1/health` → `{"status":"ok"}` HTTP 200
+  * `GET /api/v1/health/migration-state` → `{"aligned":true,"expected_heads":["20260418_000002"],"current_versions":["20260418_000002"]}` HTTP 200
+  * `GET http://localhost:8080/` → HTTP 200 (nginx serving Vite build)
+  * `scripts/deploy/smoke_check.py` → "Smoke checks passed" (frontend 200, backend-health 200, cors 200)
+* **Resource limits (B1 live proof):** `docker inspect` confirms `HostConfig.Memory` and `NanoCpus` match exactly: postgres 4294967296 / 2.0 cpu, backend 2147483648 / 1.5 cpu, frontend 268435456 / 0.5 cpu. `docker stats --no-stream` at idle: postgres 66.57 MiB (1.63%), backend 160.4 MiB (7.83%), frontend 12.38 MiB (4.84%) — every container is well under its declared cap at cold start.
+* **Log rotation (B2 live proof):** All three containers confirmed via `docker inspect` as `json-file` driver with `max-size=10m max-file=5` → 50 MB cap per service → ~150 MB total log ceiling across the stack.
+* **Bind scope (B3 live proof):** `docker port bbms_postgres_prod` returned `5432/tcp -> 127.0.0.1:5432`. Postgres is reachable only on loopback; LAN exposure requires explicit `POSTGRES_BIND_HOST` override per `HOST_PREFLIGHT.md`.
+* **Fail-fast contract (A2 live proof):** A `docker compose ps` call without `--env-file` failed with `required variable POSTGRES_PASSWORD is missing a value: POSTGRES_PASSWORD required`. Confirmed the `${VAR:?msg}` interpolation aborts the client before any container starts.
+* **Teardown:** `docker compose down` removed all containers + network; `docker volume ls` confirms `infra_postgres_prod_data` survives.
+
+#### 3. Known Issues & Tech Debt
+* **Backend and frontend have no Docker healthcheck stanza** in `docker-compose.prod.yml` — they never report `(healthy)` in `docker compose ps`, only `Up`. Not a failure; an observability gap. A future enhancement could add `curl -fsS localhost:8000/api/v1/health` as the backend healthcheck so compose itself waits on readiness during `up --wait` / `depends_on: condition: service_healthy` scenarios.
+* `.env.prod` is local-only and contains real secrets; it must stay gitignored. Preflight doc already warns on rotation before LAN exposure — kept.
+* Dead-endpoint surface (18 unwired backend endpoints) still open as future RBAC/test-coverage initiative.
+
+#### 4. Next Session Action Plan (Next Steps)
+* Entire audit roadmap is closed. Remaining candidates (operator's choice):
+  * Add healthcheck stanza to backend/frontend services so `docker compose ps` reports `(healthy)` accurately.
+  * Produce an RBAC test matrix for the 18 unwired backend endpoints (P3 from the Gap Matrix).
+  * Revisit the auth-persistence UX decision (sessionStorage vs localStorage) — P3, product call.
+* Step 3: Plan a separate initiative for the 18 unwired endpoints — either wire frontend consumers or prune backend routes to match actual product surface.

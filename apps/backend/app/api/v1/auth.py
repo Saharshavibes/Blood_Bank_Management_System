@@ -1,5 +1,6 @@
 import hmac
 from datetime import UTC, datetime
+from decimal import Decimal
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, HTTPException, Header, status
@@ -103,8 +104,8 @@ def register_hospital(
         name=payload.name,
         address=payload.address,
         city=payload.city,
-        latitude=payload.latitude,
-        longitude=payload.longitude,
+        latitude=Decimal(str(payload.latitude)) if payload.latitude is not None else None,
+        longitude=Decimal(str(payload.longitude)) if payload.longitude is not None else None,
         contact_email=payload.email,
         contact_phone=payload.contact_phone,
         is_active=True,

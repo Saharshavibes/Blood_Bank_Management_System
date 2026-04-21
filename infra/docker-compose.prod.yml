@@ -3,12 +3,22 @@ services:
     image: postgres:16-alpine
     container_name: bbms_postgres_prod
     restart: unless-stopped
+    command:
+      - "postgres"
+      - "-c"
+      - "shared_buffers=1GB"
+      - "-c"
+      - "effective_cache_size=2GB"
+      - "-c"
+      - "work_mem=16MB"
+      - "-c"
+      - "max_connections=50"
     environment:
       POSTGRES_DB: ${POSTGRES_DB:-blood_bank}
       POSTGRES_USER: ${POSTGRES_USER:-bbms_user}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-bbms_password}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD required}
     ports:
-      - "${POSTGRES_PORT:-5432}:5432"
+      - "${POSTGRES_BIND_HOST:-127.0.0.1}:${POSTGRES_PORT:-5432}:5432"
     volumes:
       - postgres_prod_data:/var/lib/postgresql/data
     healthcheck:
@@ -16,6 +26,16 @@ services:
       interval: 10s
       timeout: 5s
       retries: 5
+    deploy:
+      resources:
+        limits:
+          memory: 4G
+          cpus: "2.0"
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "5"
     networks:
       - bbms_prod_network
 
@@ -29,16 +49,27 @@ services:
       APP_NAME: ${APP_NAME:-Blood Bank Management API}
       APP_VERSION: ${APP_VERSION:-1.0.0}
       ENVIRONMENT: ${ENVIRONMENT:-production}
-      DATABASE_URL: postgresql+psycopg2://${POSTGRES_USER:-bbms_user}:${POSTGRES_PASSWORD:-bbms_password}@postgres:5432/${POSTGRES_DB:-blood_bank}
-      JWT_SECRET_KEY: ${JWT_SECRET_KEY:-change-this-secret-key}
+      DATABASE_URL: postgresql+psycopg2://${POSTGRES_USER:-bbms_user}:${POSTGRES_PASSWORD:?POSTGRES_PASSWORD required}@postgres:5432/${POSTGRES_DB:-blood_bank}
+      JWT_SECRET_KEY: ${JWT_SECRET_KEY:?JWT_SECRET_KEY required}
       JWT_ALGORITHM: ${JWT_ALGORITHM:-HS256}
       JWT_ACCESS_TOKEN_EXPIRE_MINUTES: ${JWT_ACCESS_TOKEN_EXPIRE_MINUTES:-60}
       CORS_ORIGINS: ${CORS_ORIGINS:-http://localhost:8080}
+      WEB_CONCURRENCY: ${WEB_CONCURRENCY:-2}
     depends_on:
       postgres:
         condition: service_healthy
     ports:
       - "${BACKEND_PORT:-8000}:8000"
+    deploy:
+      resources:
+        limits:
+          memory: 2G
+          cpus: "1.5"
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "5"
     networks:
       - bbms_prod_network
 
@@ -54,6 +85,16 @@ services:
       - backend
     ports:
       - "${FRONTEND_PORT:-8080}:80"
+    deploy:
+      resources:
+        limits:
+          memory: 256M
+          cpus: "0.5"
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "5"
     networks:
       - bbms_prod_network
 
