@@ -506,3 +506,47 @@ Stabilize and ship the Blood Bank Management System with reliable backend and fr
   * Produce an RBAC test matrix for the 18 unwired backend endpoints (P3 from the Gap Matrix).
   * Revisit the auth-persistence UX decision (sessionStorage vs localStorage) — P3, product call.
 * Step 3: Plan a separate initiative for the 18 unwired endpoints — either wire frontend consumers or prune backend routes to match actual product surface.
+
+### 🧠 MEMORY UPDATE
+**Date/Time:** 2026-04-24 — Demo Seed Script for Admin Dataset Hydration
+
+#### 1. Architecture & Context Shifts
+* Added standalone backend seed module at `apps/backend/scripts/seed_demo_data.py` to initialize a deterministic demo dataset with strict idempotency for repeated runs.
+* Seed flow now guarantees presence of admin login credentials (`admin@bloodbank.local`) without relying on API bootstrap endpoints.
+
+#### 2. What Was Accomplished
+* Implemented `python -m scripts.seed_demo_data` module entrypoint using `SessionLocal` and `get_password_hash` from `app.auth.security`.
+* Added idempotent admin upsert, hospital + donor user provisioning, blood bag inventory generation, blood request generation, and degraded-state telemetry baseline insertion.
+* Seed logic prevents duplicate rows by resolving existing records via stable business keys (emails, bag numbers, request numbers, event signature tuples) before create/update.
+
+#### 3. Known Issues & Tech Debt
+* `AdminDashboardPage.tsx` currently renders static snapshot cards and does not yet consume dashboard aggregate APIs, so seeded data primarily hydrates inventory/request/admin-operational flows rather than the static cards themselves.
+* Staging deployment validation remains separate from local/demo seeding and still depends on configured hook secrets.
+
+#### 4. Next Session Action Plan (Next Steps)
+* Step 1: Run `python -m scripts.seed_demo_data` in backend runtime and verify admin login plus inventory/request list hydration from live endpoints.
+* Step 2: If dashboard cards are to be live-driven, add backend aggregate endpoint and replace static `snapshots` constants in the admin dashboard page.
+* Step 3: Extend seed script with optional cleanup/reset mode when deterministic test snapshots are needed for CI smoke environments.
+
+### 🧠 MEMORY UPDATE
+**Date/Time:** 2026-04-24 — Windows Backend Environment Repair + Seed Execution Attempt
+
+#### 1. Architecture & Context Shifts
+* Updated admin seed identity in `apps/backend/scripts/seed_demo_data.py` to the requested credentials (`saharshabattula41@gmail.com` / `<Blood_bank@123>`) while preserving existing idempotent seed behavior.
+* Windows shell environment was normalized for backend local execution by setting PowerShell execution policy to `RemoteSigned` at `CurrentUser` scope.
+
+#### 2. What Was Accomplished
+* Repaired and reinstalled backend dependencies in `apps/backend/.venv` from `apps/backend/requirements.txt`.
+* Verified dependency installation state through venv pip output (`Requirement already satisfied` across backend package set).
+* Executed `python -m scripts.seed_demo_data` from `apps/backend` and captured full runtime trace.
+
+#### 3. Known Issues & Tech Debt
+* Seed execution is currently blocked by local PostgreSQL authentication mismatch:
+  * `DATABASE_URL` from `apps/backend/.env` points to `postgresql+psycopg2://bbms_user:bbms_password@localhost:5432/blood_bank`.
+  * Runtime failure: `psycopg2.OperationalError: password authentication failed for user "bbms_user"`.
+* Docker CLI is unavailable on this machine (`docker` command not found), so containerized fallback seeding cannot be used in this environment without installing Docker Desktop or providing another reachable PostgreSQL target.
+
+#### 4. Next Session Action Plan (Next Steps)
+* Step 1: Provide the correct local PostgreSQL credentials (or a valid `DATABASE_URL`) and rerun `python -m scripts.seed_demo_data`.
+* Step 2: If local Postgres is not intended, install Docker Desktop and run the backend container stack with known credentials before reseeding.
+* Step 3: Verify admin login using `saharshabattula41@gmail.com` and `<Blood_bank@123>` after successful seed completion.
