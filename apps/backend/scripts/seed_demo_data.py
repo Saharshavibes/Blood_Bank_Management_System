@@ -26,7 +26,7 @@ from app.models.hospital import Hospital
 from app.models.user import User
 
 ADMIN_EMAIL = "saharshabattula41@gmail.com"
-ADMIN_PASSWORD = "<Blood_bank@123>"
+ADMIN_PASSWORD = "Blood_bank@123"
 
 
 def ensure_admin_user(db: Session) -> tuple[User, bool]:

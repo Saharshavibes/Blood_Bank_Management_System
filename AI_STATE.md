@@ -550,3 +550,57 @@ Stabilize and ship the Blood Bank Management System with reliable backend and fr
 * Step 1: Provide the correct local PostgreSQL credentials (or a valid `DATABASE_URL`) and rerun `python -m scripts.seed_demo_data`.
 * Step 2: If local Postgres is not intended, install Docker Desktop and run the backend container stack with known credentials before reseeding.
 * Step 3: Verify admin login using `saharshabattula41@gmail.com` and `<Blood_bank@123>` after successful seed completion.
+
+### 🧠 MEMORY UPDATE
+**Date/Time:** 2026-04-25 — Admin Login Recovery for Local Demo
+
+#### 1. Architecture & Context Shifts
+* Introduced local isolated PostgreSQL demo cluster at `.demo_pg` (port `55432`) to decouple backend demo runtime from locked system PostgreSQL credentials.
+* Added `.demo_pg/` to root `.gitignore` to prevent accidental VCS inclusion of local database files.
+* Normalized auth seed credentials to `saharshabattula41@gmail.com` / `Blood_bank@123` in `apps/backend/scripts/seed_demo_data.py`.
+
+#### 2. What Was Accomplished
+* Root-cause analysis completed for login failure path:
+  * Backend unreachable during frontend login attempts.
+  * Backend seed/auth hashing blocked by `passlib` + `bcrypt` incompatibility.
+  * ORM enum persistence mismatch (enum names vs DB enum values) causing seed rollback before admin persisted.
+* Pinned `bcrypt==4.0.1` in `apps/backend/requirements.txt` to restore passlib compatibility.
+* Updated SQLAlchemy enum mappings to persist enum values across models:
+  * `apps/backend/app/models/donor.py`
+  * `apps/backend/app/models/blood_bag.py`
+  * `apps/backend/app/models/blood_request.py`
+  * `apps/backend/app/models/user.py`
+  * `apps/backend/app/models/degraded_state_event.py`
+* Applied migrations and executed `python -m scripts.seed_demo_data` successfully against the demo DB.
+* Verified backend login endpoint returns `200` for admin credentials via direct API call.
+
+#### 3. Known Issues & Tech Debt
+* System PostgreSQL service on `localhost:5432` still uses unknown credentials and remains unresolved for this user account context.
+* Current working demo depends on env override `DATABASE_URL=postgresql+psycopg2://bbms_user:bbms_password@localhost:55432/blood_bank` while the backend process is started for the demo.
+
+#### 4. Next Session Action Plan (Next Steps)
+* Step 1: If desired, converge from `.demo_pg` to system PostgreSQL by recovering/resetting system DB credentials and updating backend `.env`.
+* Step 2: Start backend with the known `DATABASE_URL` override (or update `.env`) before running frontend demo sessions.
+* Step 3: Commit and push the auth/enum/bcrypt fixes after user validation of UI login flow.
+
+### 🧠 MEMORY UPDATE
+**Date/Time:** 2026-04-25 — UI Login Validation and CORS Closure
+
+#### 1. Architecture & Context Shifts
+* Backend runtime launched with explicit local demo overrides:
+  * `DATABASE_URL=postgresql+psycopg2://bbms_user:bbms_password@localhost:55432/blood_bank`
+  * `CORS_ORIGINS=http://localhost:5173,http://127.0.0.1:5173`
+* Frontend runtime launched on `http://127.0.0.1:5173` for browser validation.
+
+#### 2. What Was Accomplished
+* Reproduced and closed the exact UI error shown in login screenshot.
+* Confirmed browser-level fix: preflight `OPTIONS /api/v1/auth/login` now returns `200`, followed by successful `POST /api/v1/auth/login` `200`.
+* Verified successful route transition to `/admin` with authenticated admin identity visible (`saharshabattula41@gmail.com`).
+
+#### 3. Known Issues & Tech Debt
+* Root system PostgreSQL instance at `localhost:5432` still has unknown credentials and is currently bypassed via isolated `.demo_pg` runtime for local demo operations.
+
+#### 4. Next Session Action Plan (Next Steps)
+* Step 1: Decide whether to keep `.demo_pg` as local demo standard or migrate back to system PostgreSQL after credential recovery.
+* Step 2: Commit and push runtime/auth fixes once demo acceptance is confirmed by user.
+* Step 3: Add a short local-run doc note describing the required `DATABASE_URL` and `CORS_ORIGINS` values for deterministic login behavior.

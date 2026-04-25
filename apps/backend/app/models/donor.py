@@ -28,7 +28,13 @@ class Donor(Base):
     phone: Mapped[str] = mapped_column(String(30), nullable=False)
     date_of_birth: Mapped[date] = mapped_column(Date, nullable=False)
     blood_type: Mapped[BloodType] = mapped_column(
-        SAEnum(BloodType, name="blood_type_enum", native_enum=False, validate_strings=True),
+        SAEnum(
+            BloodType,
+            name="blood_type_enum",
+            native_enum=False,
+            validate_strings=True,
+            values_callable=lambda enum_type: [member.value for member in enum_type],
+        ),
         nullable=False,
         index=True,
     )

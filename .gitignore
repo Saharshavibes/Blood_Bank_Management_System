@@ -40,6 +40,7 @@ venv/
 **/node_modules/
 **/dist/
 *.tsbuildinfo
+.demo_pg/
 
 # Pre-commit tooling artifacts
 .pre-commit-cache/
