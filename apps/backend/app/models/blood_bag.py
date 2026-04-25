@@ -47,18 +47,36 @@ class BloodBag(Base):
         index=True,
     )
     blood_type: Mapped[BloodType] = mapped_column(
-        SAEnum(BloodType, name="blood_type_enum", native_enum=False, validate_strings=True),
+        SAEnum(
+            BloodType,
+            name="blood_type_enum",
+            native_enum=False,
+            validate_strings=True,
+            values_callable=lambda enum_type: [member.value for member in enum_type],
+        ),
         nullable=False,
     )
     component: Mapped[BloodComponent] = mapped_column(
-        SAEnum(BloodComponent, name="blood_component_enum", native_enum=False, validate_strings=True),
+        SAEnum(
+            BloodComponent,
+            name="blood_component_enum",
+            native_enum=False,
+            validate_strings=True,
+            values_callable=lambda enum_type: [member.value for member in enum_type],
+        ),
         nullable=False,
     )
     volume_ml: Mapped[int] = mapped_column(Integer, nullable=False)
     collection_date: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
     expiration_date: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, index=True)
     status: Mapped[BloodBagStatus] = mapped_column(
-        SAEnum(BloodBagStatus, name="blood_bag_status_enum", native_enum=False, validate_strings=True),
+        SAEnum(
+            BloodBagStatus,
+            name="blood_bag_status_enum",
+            native_enum=False,
+            validate_strings=True,
+            values_callable=lambda enum_type: [member.value for member in enum_type],
+        ),
         nullable=False,
         server_default=text("'collected'"),
         index=True,

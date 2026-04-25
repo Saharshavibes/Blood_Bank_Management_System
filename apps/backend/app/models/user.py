@@ -25,7 +25,13 @@ class User(Base):
     email: Mapped[str] = mapped_column(String(255), nullable=False, unique=True, index=True)
     password_hash: Mapped[str] = mapped_column(String(255), nullable=False)
     role: Mapped[UserRole] = mapped_column(
-        SAEnum(UserRole, name="user_role_enum", native_enum=False, validate_strings=True),
+        SAEnum(
+            UserRole,
+            name="user_role_enum",
+            native_enum=False,
+            validate_strings=True,
+            values_callable=lambda enum_type: [member.value for member in enum_type],
+        ),
         nullable=False,
         index=True,
     )

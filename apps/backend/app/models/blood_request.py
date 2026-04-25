@@ -33,20 +33,44 @@ class BloodRequest(Base):
         index=True,
     )
     blood_type: Mapped[BloodType] = mapped_column(
-        SAEnum(BloodType, name="blood_type_enum", native_enum=False, validate_strings=True),
+        SAEnum(
+            BloodType,
+            name="blood_type_enum",
+            native_enum=False,
+            validate_strings=True,
+            values_callable=lambda enum_type: [member.value for member in enum_type],
+        ),
         nullable=False,
     )
     component: Mapped[BloodComponent] = mapped_column(
-        SAEnum(BloodComponent, name="blood_component_enum", native_enum=False, validate_strings=True),
+        SAEnum(
+            BloodComponent,
+            name="blood_component_enum",
+            native_enum=False,
+            validate_strings=True,
+            values_callable=lambda enum_type: [member.value for member in enum_type],
+        ),
         nullable=False,
     )
     units_requested: Mapped[int] = mapped_column(Integer, nullable=False)
     urgency: Mapped[RequestUrgency] = mapped_column(
-        SAEnum(RequestUrgency, name="request_urgency_enum", native_enum=False, validate_strings=True),
+        SAEnum(
+            RequestUrgency,
+            name="request_urgency_enum",
+            native_enum=False,
+            validate_strings=True,
+            values_callable=lambda enum_type: [member.value for member in enum_type],
+        ),
         nullable=False,
     )
     status: Mapped[RequestStatus] = mapped_column(
-        SAEnum(RequestStatus, name="request_status_enum", native_enum=False, validate_strings=True),
+        SAEnum(
+            RequestStatus,
+            name="request_status_enum",
+            native_enum=False,
+            validate_strings=True,
+            values_callable=lambda enum_type: [member.value for member in enum_type],
+        ),
         nullable=False,
         server_default=text("'pending'"),
     )

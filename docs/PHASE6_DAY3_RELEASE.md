@@ -41,7 +41,9 @@ Staging:
 - BACKEND_AUTH_LOGIN_URL_STAGING
 - FRONTEND_URL_STAGING
 
-Legacy fallback secrets are no longer supported by the workflows.
+Legacy fallback secrets are not supported by the workflows.
+Staging deploy runs fail immediately when any staging deploy-hook or endpoint secret is missing.
+Staging deploy runs verify hook isolation and block execution if resolved hooks do not come from staging secrets or match production hook values.
 
 ## 4) Go-live sequence
 

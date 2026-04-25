@@ -22,7 +22,7 @@ class Settings(BaseSettings):
     jwt_refresh_token_expire_days: int = 14
     refresh_token_entropy_bytes: int = 48
     admin_bootstrap_token: str = ""
-    cors_origins: Annotated[list[str], NoDecode] = ["http://localhost:5173"]
+    cors_origins: Annotated[list[str], NoDecode] = ["http://localhost:5173", "http://127.0.0.1:5173"]
 
     @field_validator("database_url", mode="before")
     @classmethod
