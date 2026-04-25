@@ -25,8 +25,8 @@ from app.models.enums import (
 from app.models.hospital import Hospital
 from app.models.user import User
 
-ADMIN_EMAIL = "saharshabattula41@gmail.com"
-ADMIN_PASSWORD = "Blood_bank@123"
+ADMIN_EMAIL = "admin.operations@lifelinebloodbank.in"
+ADMIN_PASSWORD = "LifelineAdmin@2026"
 
 
 def ensure_admin_user(db: Session) -> tuple[User, bool]:
@@ -54,24 +54,34 @@ def ensure_admin_user(db: Session) -> tuple[User, bool]:
 def ensure_hospitals(db: Session) -> tuple[dict[str, Hospital], int]:
     records = [
         {
-            "email": "hospital.alpha@bloodbank.local",
-            "password": "HospitalAlpha123!",
-            "name": "Central City Hospital",
-            "address": "14 Care Avenue",
-            "city": "Metropolis",
-            "latitude": Decimal("40.712776"),
-            "longitude": Decimal("-74.005974"),
-            "contact_phone": "+1-212-555-0101",
+            "email": "transfusiondesk@lifecare-hospital.in",
+            "password": "LifeCareDesk@2026",
+            "name": "LifeCare Multispeciality Hospital",
+            "address": "Road 12, Banjara Hills",
+            "city": "Hyderabad",
+            "latitude": Decimal("17.412153"),
+            "longitude": Decimal("78.448295"),
+            "contact_phone": "+91-40-2335-2040",
         },
         {
-            "email": "hospital.beta@bloodbank.local",
-            "password": "HospitalBeta123!",
-            "name": "Northside Medical Center",
-            "address": "88 Relief Street",
-            "city": "Gotham",
-            "latitude": Decimal("34.052235"),
-            "longitude": Decimal("-118.243683"),
-            "contact_phone": "+1-310-555-0199",
+            "email": "bloodbank.coordinator@riverfrontmed.in",
+            "password": "RiverfrontDesk@2026",
+            "name": "Riverfront Medical Institute",
+            "address": "Financial District, Nanakramguda",
+            "city": "Hyderabad",
+            "latitude": Decimal("17.416344"),
+            "longitude": Decimal("78.346318"),
+            "contact_phone": "+91-40-6112-7788",
+        },
+        {
+            "email": "transfusion.unit@greenvalleycare.in",
+            "password": "GreenValleyDesk@2026",
+            "name": "Green Valley Care Hospital",
+            "address": "Madhapur Main Road",
+            "city": "Hyderabad",
+            "latitude": Decimal("17.452396"),
+            "longitude": Decimal("78.391495"),
+            "contact_phone": "+91-40-4860-1100",
         },
     ]
 
@@ -129,31 +139,40 @@ def ensure_hospitals(db: Session) -> tuple[dict[str, Hospital], int]:
 def ensure_donors(db: Session) -> tuple[dict[str, Donor], int]:
     records = [
         {
-            "email": "donor.alex@bloodbank.local",
-            "password": "DonorAlex123!",
-            "full_name": "Alex Morgan",
-            "phone": "+1-202-555-0144",
-            "date_of_birth": date(1991, 5, 12),
+            "email": "ananya.reddy@donor-demo.in",
+            "password": "AnanyaDonor@2026",
+            "full_name": "Ananya Reddy",
+            "phone": "+91-90000-41001",
+            "date_of_birth": date(1994, 8, 16),
             "blood_type": BloodType.O_POS,
-            "medical_history": "No known chronic disease",
+            "medical_history": "No chronic conditions; regular donor every 4 months",
         },
         {
-            "email": "donor.bianca@bloodbank.local",
-            "password": "DonorBianca123!",
-            "full_name": "Bianca Flores",
-            "phone": "+1-202-555-0145",
-            "date_of_birth": date(1988, 11, 3),
+            "email": "vikas.sharma@donor-demo.in",
+            "password": "VikasDonor@2026",
+            "full_name": "Vikas Sharma",
+            "phone": "+91-90000-41002",
+            "date_of_birth": date(1989, 1, 27),
             "blood_type": BloodType.A_NEG,
-            "medical_history": "Mild seasonal allergy",
+            "medical_history": "Mild seasonal rhinitis; clinically fit for donation",
         },
         {
-            "email": "donor.carter@bloodbank.local",
-            "password": "DonorCarter123!",
-            "full_name": "Carter Singh",
-            "phone": "+1-202-555-0146",
-            "date_of_birth": date(1994, 2, 21),
+            "email": "meera.nair@donor-demo.in",
+            "password": "MeeraDonor@2026",
+            "full_name": "Meera Nair",
+            "phone": "+91-90000-41003",
+            "date_of_birth": date(1992, 6, 4),
             "blood_type": BloodType.B_POS,
-            "medical_history": "No transfusion history",
+            "medical_history": "No transfusion history; hemoglobin stable in prior screenings",
+        },
+        {
+            "email": "fahad.khan@donor-demo.in",
+            "password": "FahadDonor@2026",
+            "full_name": "Fahad Khan",
+            "phone": "+91-90000-41004",
+            "date_of_birth": date(1987, 12, 9),
+            "blood_type": BloodType.AB_NEG,
+            "medical_history": "No chronic illnesses; voluntary donor since 2018",
         },
     ]
 
@@ -276,7 +295,7 @@ def ensure_blood_requests(db: Session, hospitals: dict[str, Hospital]) -> int:
     records = [
         {
             "request_number": "DEMO-REQ-0001",
-            "hospital_email": "hospital.alpha@bloodbank.local",
+            "hospital_email": "transfusiondesk@lifecare-hospital.in",
             "blood_type": BloodType.A_POS,
             "component": BloodComponent.PACKED_RED_CELLS,
             "units_requested": 3,
@@ -284,11 +303,11 @@ def ensure_blood_requests(db: Session, hospitals: dict[str, Hospital]) -> int:
             "status": RequestStatus.PENDING,
             "requested_at": now - timedelta(hours=30),
             "fulfilled_at": None,
-            "notes": "Routine replenishment for surgery schedule",
+            "notes": "Scheduled orthopedic surgeries for next morning shift",
         },
         {
             "request_number": "DEMO-REQ-0002",
-            "hospital_email": "hospital.beta@bloodbank.local",
+            "hospital_email": "bloodbank.coordinator@riverfrontmed.in",
             "blood_type": BloodType.O_NEG,
             "component": BloodComponent.PACKED_RED_CELLS,
             "units_requested": 2,
@@ -296,11 +315,11 @@ def ensure_blood_requests(db: Session, hospitals: dict[str, Hospital]) -> int:
             "status": RequestStatus.PENDING,
             "requested_at": now - timedelta(hours=12),
             "fulfilled_at": None,
-            "notes": "Emergency trauma intake request",
+            "notes": "Emergency trauma admission from highway accident",
         },
         {
             "request_number": "DEMO-REQ-0003",
-            "hospital_email": "hospital.alpha@bloodbank.local",
+            "hospital_email": "transfusion.unit@greenvalleycare.in",
             "blood_type": BloodType.B_POS,
             "component": BloodComponent.PLASMA,
             "units_requested": 4,
@@ -308,11 +327,11 @@ def ensure_blood_requests(db: Session, hospitals: dict[str, Hospital]) -> int:
             "status": RequestStatus.FULFILLED,
             "requested_at": now - timedelta(days=2, hours=6),
             "fulfilled_at": now - timedelta(days=2, hours=2),
-            "notes": "Oncology support batch fulfilled",
+            "notes": "Post-operative support for hepatology ICU cases",
         },
         {
             "request_number": "DEMO-REQ-0004",
-            "hospital_email": "hospital.beta@bloodbank.local",
+            "hospital_email": "transfusiondesk@lifecare-hospital.in",
             "blood_type": BloodType.AB_NEG,
             "component": BloodComponent.PLATELETS,
             "units_requested": 1,
@@ -320,11 +339,11 @@ def ensure_blood_requests(db: Session, hospitals: dict[str, Hospital]) -> int:
             "status": RequestStatus.FULFILLED,
             "requested_at": now - timedelta(days=1, hours=8),
             "fulfilled_at": now - timedelta(days=1, hours=5),
-            "notes": "Critical neonatal platelet support completed",
+            "notes": "Neonatal ICU platelet support completed within SLA",
         },
         {
             "request_number": "DEMO-REQ-0005",
-            "hospital_email": "hospital.alpha@bloodbank.local",
+            "hospital_email": "bloodbank.coordinator@riverfrontmed.in",
             "blood_type": BloodType.O_POS,
             "component": BloodComponent.WHOLE_BLOOD,
             "units_requested": 5,
@@ -332,7 +351,7 @@ def ensure_blood_requests(db: Session, hospitals: dict[str, Hospital]) -> int:
             "status": RequestStatus.PARTIALLY_FULFILLED,
             "requested_at": now - timedelta(hours=20),
             "fulfilled_at": None,
-            "notes": "Mass casualty response still in progress",
+            "notes": "Multi-casualty response; additional units expected in next dispatch",
         },
     ]
 

@@ -519,6 +519,32 @@ Stabilize and ship the Blood Bank Management System with reliable backend and fr
 * Added idempotent admin upsert, hospital + donor user provisioning, blood bag inventory generation, blood request generation, and degraded-state telemetry baseline insertion.
 * Seed logic prevents duplicate rows by resolving existing records via stable business keys (emails, bag numbers, request numbers, event signature tuples) before create/update.
 
+### 🧠 MEMORY UPDATE
+**Date/Time:** 2026-04-25 — Realistic Demo Identity Dataset Refresh
+
+#### 1. Architecture & Context Shifts
+* Refreshed seed identities in `apps/backend/scripts/seed_demo_data.py` to use realistic institutional/demo personas for admin, hospitals, and donors.
+* Kept idempotent upsert behavior intact by continuing to key records on deterministic emails and request/bag identifiers.
+
+#### 2. What Was Accomplished
+* Updated admin credentials to a realistic operations identity (`admin.operations@lifelinebloodbank.in`).
+* Replaced synthetic hospital demo entries with realistic Hyderabad-style facilities, contact emails, phone numbers, and coordinates.
+* Replaced synthetic donor entries with realistic donor profiles and credential pairs.
+* Updated blood request notes and hospital mappings to reflect plausible clinical scenarios.
+* Executed `python -m scripts.seed_demo_data` successfully and validated login success for:
+  * admin user
+  * one donor user
+  * one hospital user
+
+#### 3. Known Issues & Tech Debt
+* Existing older seed identities remain in DB from previous runs by design (non-destructive idempotent seed approach).
+* If strict demo snapshots are required, a cleanup/reset mode is still needed to remove legacy seed rows before reseeding.
+
+#### 4. Next Session Action Plan (Next Steps)
+* Step 1: Add optional `--reset` mode to `seed_demo_data.py` for deterministic fresh demo datasets.
+* Step 2: Align frontend demo login hints/documentation with the updated realistic credentials.
+* Step 3: Commit and push the updated seed dataset after user acceptance.
+
 #### 3. Known Issues & Tech Debt
 * `AdminDashboardPage.tsx` currently renders static snapshot cards and does not yet consume dashboard aggregate APIs, so seeded data primarily hydrates inventory/request/admin-operational flows rather than the static cards themselves.
 * Staging deployment validation remains separate from local/demo seeding and still depends on configured hook secrets.
